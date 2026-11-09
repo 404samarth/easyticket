@@ -155,6 +155,101 @@ $("drawerLogout").addEventListener("click",async()=>{
   toast("Logged out successfully.");
  }catch(e){toast(e.message);}
 });
+
+// Account Manager and Change Password
+function openChangePassword() {
+ closeAccountDrawer();
+ $("changePasswordForm").reset();
+ openModal("changePasswordModal");
+}
+
+async function openAccountManager() {
+ closeAccountDrawer();
+ const form = $("accountManagerForm");
+ form.reset();
+
+ try {
+  const profile = await api("/api/account/profile");
+  form.elements.fullName.value = profile.full_name || profile.fullName || "";
+  form.elements.email.value = profile.email || "";
+  form.elements.phone.value = profile.phone || "";
+  openModal("accountManagerModal");
+ } catch (e) {
+  toast(e.message);
+ }
+}
+
+$("drawerChangePassword").addEventListener("click", openChangePassword);
+$("drawerAccountManager").addEventListener("click", openAccountManager);
+
+$("changePasswordForm").addEventListener("submit", async e => {
+ e.preventDefault();
+
+ const form = e.currentTarget;
+ const values = new FormData(form);
+ const currentPassword = values.get("currentPassword");
+ const newPassword = values.get("newPassword");
+ const confirmPassword = values.get("confirmPassword");
+
+ if (newPassword !== confirmPassword) {
+  toast("New password and confirmation do not match.");
+  return;
+ }
+
+ const button = form.querySelector('button[type="submit"]');
+ button.disabled = true;
+ button.textContent = "Updating…";
+
+ try {
+  const result = await api("/api/account/change-password", {
+   method: "POST",
+   body: JSON.stringify({currentPassword, newPassword})
+  });
+
+  form.reset();
+  closeModal("changePasswordModal");
+  toast(result.message || "Password changed successfully.");
+ } catch (err) {
+  toast(err.message);
+ } finally {
+  button.disabled = false;
+  button.textContent = "Update Password";
+ }
+});
+
+$("accountManagerForm").addEventListener("submit", async e => {
+ e.preventDefault();
+
+ const form = e.currentTarget;
+ const values = new FormData(form);
+ const payload = {
+  fullName: String(values.get("fullName") || "").trim(),
+  email: String(values.get("email") || "").trim(),
+  phone: String(values.get("phone") || "").trim()
+ };
+
+ const button = form.querySelector('button[type="submit"]');
+ button.disabled = true;
+ button.textContent = "Saving…";
+
+ try {
+  const result = await api("/api/account/profile", {
+   method: "PUT",
+   body: JSON.stringify(payload)
+  });
+
+  await refreshUser();
+  $("drawerUserName").textContent = result.fullName || payload.fullName;
+  closeModal("accountManagerModal");
+  toast(result.message || "Account details updated successfully.");
+ } catch (err) {
+  toast(err.message);
+ } finally {
+  button.disabled = false;
+  button.textContent = "Save Changes";
+ }
+});
+
 $("authForm").addEventListener("submit",async e=>{
  e.preventDefault();
  const form=e.currentTarget;
@@ -336,6 +431,135 @@ async function loadBookingHistory() {
  }
 }
 
+
+// Public EasyTicket PNR Status
+function renderPnrStatus(booking) {
+ const passengers = booking.passengers || [];
+ const history = booking.statusHistory || [];
+
+ const journeyDate = booking.journeyDate
+  ? new Date(String(booking.journeyDate).slice(0, 10) + "T00:00:00").toLocaleDateString("en-IN", {
+      day: "2-digit", month: "short", year: "numeric"
+    })
+  : "—";
+
+ const dateTime = value => {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? esc(value) :
+   d.toLocaleString("en-IN", {dateStyle:"medium", timeStyle:"short"});
+ };
+
+ $("pnrStatusResult").innerHTML = `
+  <article class="history-card pnr-result-card">
+   <div class="history-card-top">
+    <div>
+     <span class="history-pnr-label">EASYTICKET PNR</span>
+     <strong class="history-pnr">${esc(booking.pnr)}</strong>
+    </div>
+    <span class="history-status">${esc(booking.bookingStatus || "UNKNOWN")}</span>
+   </div>
+
+   <div class="pnr-result-body">
+    <div class="pnr-train-heading">
+     <div>
+      <strong>${esc(booking.trainName || "Train")}</strong>
+      <span>Train No. ${esc(booking.trainNumber)}</span>
+     </div>
+     <span>${esc(booking.travelClass || "—")} · ${esc(booking.quota || "—")}</span>
+    </div>
+
+    <div class="pnr-route">
+     <div><strong>${esc(booking.fromCode)}</strong><span>${esc(booking.fromName)}</span></div>
+     <div class="pnr-route-arrow">→</div>
+     <div><strong>${esc(booking.toCode)}</strong><span>${esc(booking.toName)}</span></div>
+    </div>
+
+    <div class="pnr-detail-grid">
+     <div><small>JOURNEY DATE</small><strong>${esc(journeyDate)}</strong></div>
+     <div><small>PASSENGERS</small><strong>${esc(booking.passengerCount)}</strong></div>
+     <div><small>BOOKING STATUS</small><strong>${esc(booking.bookingStatus)}</strong></div>
+     <div><small>BOOKED ON</small><strong>${dateTime(booking.bookedAt)}</strong></div>
+    </div>
+
+    <div class="pnr-subsection">
+     <h3>Passenger Status</h3>
+     ${passengers.length ? passengers.map((passenger, i) => `
+      <div class="pnr-passenger-row">
+       <strong>Passenger ${i + 1}</strong>
+       <span>${esc(passenger.passengerStatus || "—")}</span>
+       <small>Seat / Berth: ${esc(passenger.seatNumber || "Not allotted")}</small>
+      </div>
+     `).join("") : '<p class="pnr-muted">No passenger details available.</p>'}
+    </div>
+
+    <div class="pnr-subsection">
+     <h3>Booking Status Timeline</h3>
+     ${history.length ? `
+      <div class="pnr-timeline">
+       ${history.map(item => `
+        <div class="pnr-timeline-item">
+         <strong>${esc(item.newStatus || "Status updated")}</strong>
+         <span>${esc(item.remarks || "")}</span>
+         <small>${dateTime(item.changedAt)}</small>
+        </div>
+       `).join("")}
+      </div>
+     ` : '<p class="pnr-muted">No additional status updates available.</p>'}
+    </div>
+   </div>
+  </article>`;
+}
+
+async function showPnrStatus() {
+ closeAccountDrawer();
+
+ $("bookingHistorySection").hidden = true;
+ $("transactionHistorySection").hidden = true;
+ $("cancellationHistorySection").hidden = true;
+ $("pnrStatusSection").hidden = false;
+ $("resultsSection").hidden = true;
+ $("howItWorks").hidden = true;
+
+ $("navBookNow").classList.remove("active");
+ $("navBookingHistory").classList.remove("active");
+ $("navTransactionHistory").classList.remove("active");
+ $("navCancellationHistory").classList.remove("active");
+ $("navPnrStatus").classList.add("active");
+
+ $("navLinks").classList.remove("open");
+ $("pnrStatusSection").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+$("navPnrStatus").addEventListener("click", e => {
+ e.preventDefault();
+ showPnrStatus();
+});
+
+$("pnrSearchForm").addEventListener("submit", async e => {
+ e.preventDefault();
+
+ const pnr = $("pnrInput").value.trim().toUpperCase();
+ if (!pnr) {
+  toast("Please enter an EasyTicket PNR.");
+  return;
+ }
+
+ const result = $("pnrStatusResult");
+ result.innerHTML = '<div class="loading-state">Checking PNR status…</div>';
+
+ try {
+  const booking = await api("/api/pnr/" + encodeURIComponent(pnr));
+  renderPnrStatus(booking);
+ } catch (error) {
+  result.innerHTML = `
+   <div class="empty-state">
+    <h3>PNR not found</h3>
+    <p>${esc(error.message)}</p>
+   </div>`;
+ }
+});
+
 async function showBookingHistory() {
  closeAccountDrawer();
  const user = await refreshUser();
@@ -351,6 +575,8 @@ async function showBookingHistory() {
  $("bookingHistorySection").hidden = false;
  $("transactionHistorySection").hidden = true;
  $("cancellationHistorySection").hidden = true;
+ $("pnrStatusSection").hidden = true;
+ $("navPnrStatus").classList.remove("active");
  $("navCancellationHistory").classList.remove("active");
  $("navTransactionHistory").classList.remove("active");
  $("resultsSection").hidden = true;
@@ -367,6 +593,8 @@ function showBookNow() {
  $("bookingHistorySection").hidden = true;
  $("transactionHistorySection").hidden = true;
  $("cancellationHistorySection").hidden = true;
+ $("pnrStatusSection").hidden = true;
+ $("navPnrStatus").classList.remove("active");
  $("navCancellationHistory").classList.remove("active");
  $("navBookingHistory").classList.remove("active");
  $("navTransactionHistory").classList.remove("active");
@@ -483,6 +711,8 @@ async function showTransactionHistory(bookingId = null) {
  $("bookingHistorySection").hidden = true;
  $("transactionHistorySection").hidden = false;
  $("cancellationHistorySection").hidden = true;
+ $("pnrStatusSection").hidden = true;
+ $("navPnrStatus").classList.remove("active");
  $("navCancellationHistory").classList.remove("active");
  $("resultsSection").hidden = true;
  $("howItWorks").hidden = true;
@@ -596,6 +826,8 @@ async function showCancellationHistory() {
  $("bookingHistorySection").hidden = true;
  $("transactionHistorySection").hidden = true;
  $("cancellationHistorySection").hidden = false;
+ $("pnrStatusSection").hidden = true;
+ $("navPnrStatus").classList.remove("active");
  $("resultsSection").hidden = true;
  $("howItWorks").hidden = true;
 

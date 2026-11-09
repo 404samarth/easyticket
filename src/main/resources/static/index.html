@@ -21,7 +21,7 @@
       <a href="#bookingHistorySection" id="navBookingHistory">Booking History</a>
       <a href="#transactionHistorySection" id="navTransactionHistory">Transaction History</a>
       <a href="#cancellationHistorySection" id="navCancellationHistory">Cancellation History</a>
-      <a href="#howItWorks">How it works</a>
+      <a href="#pnrStatusSection" id="navPnrStatus">PNR Status</a>
     </nav>
     <div class="top-actions">
       <button class="icon-btn" id="accountButton" title="Account" aria-label="Account">♙</button>
@@ -110,6 +110,24 @@
     </section>
 
 
+    <section class="transaction-history-section" id="pnrStatusSection" hidden>
+      <div class="history-heading">
+        <div>
+          <span class="eyebrow">EASYTICKET BOOKING LOOKUP</span>
+          <h2>PNR Status</h2>
+          <p>Check the latest status and details of your EasyTicket booking.</p>
+        </div>
+      </div>
+      <form id="pnrSearchForm" class="stack-form">
+        <label for="pnrInput">EASYTICKET PNR
+          <input id="pnrInput" name="pnr" type="text" maxlength="30"
+                 placeholder="Enter your PNR" autocomplete="off" required>
+        </label>
+        <button type="submit" class="primary-btn">Check PNR Status</button>
+      </form>
+      <div id="pnrStatusResult" aria-live="polite"></div>
+    </section>
+
     <section class="transaction-history-section" id="cancellationHistorySection" hidden>
       <div class="history-heading">
         <div>
@@ -167,6 +185,38 @@
     </form>
   </section></div>
 
+  <!-- Change password -->
+  <div class="overlay" id="changePasswordModal" hidden>
+    <section class="dialog">
+      <div class="dialog-head">
+        <div><span class="eyebrow">ACCOUNT SECURITY</span><h2>Change Password</h2><p>Verify your current password before setting a new one.</p></div>
+        <button class="close-btn" type="button" data-close="changePasswordModal">×</button>
+      </div>
+      <form id="changePasswordForm" class="stack-form">
+        <label>Current password<input name="currentPassword" type="password" required autocomplete="current-password"></label>
+        <label>New password<input name="newPassword" type="password" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+        <label>Confirm new password<input name="confirmPassword" type="password" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+        <button class="primary-btn" type="submit">Update Password</button>
+      </form>
+    </section>
+  </div>
+
+  <!-- Account manager -->
+  <div class="overlay" id="accountManagerModal" hidden>
+    <section class="dialog">
+      <div class="dialog-head">
+        <div><span class="eyebrow">PERSONAL INFORMATION</span><h2>Account Manager</h2><p>View and update your account details.</p></div>
+        <button class="close-btn" type="button" data-close="accountManagerModal">×</button>
+      </div>
+      <form id="accountManagerForm" class="stack-form">
+        <label>Full name<input name="fullName" type="text" required minlength="2" maxlength="120" autocomplete="name"></label>
+        <label>Email address<input name="email" type="email" required autocomplete="email"></label>
+        <label>Phone number<input name="phone" type="tel" required minlength="10" maxlength="15" pattern="[0-9]{10,15}" inputmode="numeric" autocomplete="tel"></label>
+        <button class="primary-btn" type="submit">Save Changes</button>
+      </form>
+    </section>
+  </div>
+
   <!-- Availability details -->
   <div class="overlay" id="availabilityModal" hidden><section class="dialog">
     <div class="dialog-head"><div><span class="eyebrow">SELECT YOUR CLASS</span><h2 id="availabilityTitle">Availability & fare</h2><p id="availabilityTrain"></p></div><button class="close-btn" data-close="availabilityModal">×</button></div>
@@ -208,8 +258,8 @@
       <button type="button" id="drawerBookingHistory">Booking History</button>
       <button type="button" id="drawerTransactionHistory">Transaction History</button>
       <button type="button" id="drawerCancellationHistory">Cancellation History</button>
-      <button type="button" disabled>Change Password · Coming soon</button>
-      <button type="button" disabled>Account Manager · Coming soon</button>
+      <button type="button" id="drawerChangePassword">Change Password</button>
+      <button type="button" id="drawerAccountManager">Account Manager</button>
     </div>
     <button type="button" class="drawer-logout" id="drawerLogout">Log out</button>
   </aside>

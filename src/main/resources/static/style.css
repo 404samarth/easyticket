@@ -766,3 +766,272 @@
     gap: 10px;
   }
 }
+
+/* ===== Train Schedule Timeline ===== */
+.wide-dialog:has(.schedule-list) {
+ width: min(100%, 780px);
+}
+
+.schedule-summary {
+ display: grid;
+ grid-template-columns: repeat(3, 1fr);
+ gap: 10px;
+ padding: 16px 0;
+ border-bottom: 1px solid #edf1f5;
+}
+
+.schedule-stat {
+ background: #f5f9fc;
+ border: 1px solid #e8f0f6;
+ border-radius: 10px;
+ padding: 12px;
+ text-align: center;
+}
+
+.schedule-stat strong {
+ display: block;
+ color: #347fae;
+ font: 800 21px Manrope;
+}
+
+.schedule-stat span {
+ display: block;
+ color: #8494a4;
+ font-size: 10px;
+ margin-top: 3px;
+}
+
+.schedule-list-head {
+ display: none;
+}
+
+.schedule-list {
+ padding: 17px 0 5px;
+}
+
+.schedule-halt {
+ display: grid;
+ grid-template-columns: 24px minmax(0, 1fr);
+ gap: 12px;
+ position: relative;
+}
+
+.schedule-timeline-marker {
+ display: flex;
+ justify-content: center;
+ position: relative;
+}
+
+.schedule-timeline-marker:after {
+ content: "";
+ position: absolute;
+ top: 17px;
+ bottom: -5px;
+ width: 2px;
+ background: #dceaf4;
+}
+
+.schedule-halt:last-child .schedule-timeline-marker:after {
+ display: none;
+}
+
+.schedule-timeline-marker span {
+ width: 13px;
+ height: 13px;
+ border-radius: 50%;
+ background: #fff;
+ border: 3px solid #398fc5;
+ margin-top: 5px;
+ z-index: 1;
+}
+
+.schedule-halt-content {
+ border: 1px solid #e7eef4;
+ border-radius: 11px;
+ padding: 12px 14px;
+ margin-bottom: 9px;
+ background: #fff;
+ min-width: 0;
+}
+
+.schedule-halt-top {
+ display: flex;
+ justify-content: space-between;
+ align-items: flex-start;
+ gap: 10px;
+}
+
+.schedule-halt-top strong {
+ display: block;
+ color: #344c63;
+ font-size: 13px;
+}
+
+.schedule-halt-top small,
+.schedule-pass-station small {
+ display: block;
+ color: #94a1ae;
+ font-size: 10px;
+ margin-top: 4px;
+}
+
+.schedule-day {
+ background: #f0f6fa;
+ color: #6d879b;
+ border-radius: 20px;
+ padding: 5px 8px;
+ font-size: 9px;
+ white-space: nowrap;
+}
+
+.schedule-times {
+ display: flex;
+ gap: 30px;
+ margin-top: 13px;
+}
+
+.schedule-times div {
+ display: grid;
+ gap: 4px;
+}
+
+.schedule-times small {
+ color: #9aa6b2;
+ font-size: 8px;
+ letter-spacing: .6px;
+}
+
+.schedule-times b {
+ color: #3d5b75;
+ font-size: 12px;
+}
+
+.schedule-intermediate {
+ margin: -2px 0 12px 36px;
+ border: 1px solid #e5edf3;
+ border-radius: 10px;
+ background: #f8fbfd;
+ overflow: hidden;
+}
+
+.schedule-intermediate summary {
+ display: flex;
+ align-items: center;
+ gap: 9px;
+ padding: 11px 13px;
+ cursor: pointer;
+ list-style: none;
+ color: #4b86ad;
+ font-size: 10px;
+ font-weight: 800;
+}
+
+.schedule-intermediate summary::-webkit-details-marker {
+ display: none;
+}
+
+.schedule-intermediate summary:after {
+ content: "⌄";
+ margin-left: auto;
+ font-size: 15px;
+}
+
+.schedule-intermediate[open] summary:after {
+ content: "⌃";
+}
+
+.schedule-intermediate-icon {
+ display: grid;
+ place-items: center;
+ width: 20px;
+ height: 20px;
+ border-radius: 6px;
+ background: #e6f2fa;
+ font-size: 14px;
+}
+
+.schedule-intermediate summary small {
+ color: #9aa8b5;
+ font-size: 9px;
+ font-weight: 500;
+ margin-left: auto;
+}
+
+.schedule-intermediate[open] summary small {
+ display: none;
+}
+
+.schedule-intermediate-list {
+ border-top: 1px solid #e8eff4;
+ padding: 5px 13px;
+}
+
+.schedule-pass-station {
+ display: grid;
+ grid-template-columns: 12px minmax(0, 1fr) auto;
+ align-items: center;
+ gap: 9px;
+ padding: 9px 0;
+ border-bottom: 1px dashed #e5edf3;
+}
+
+.schedule-pass-station:last-child {
+ border-bottom: 0;
+}
+
+.schedule-pass-dot {
+ width: 6px;
+ height: 6px;
+ border-radius: 50%;
+ background: #a9bac8;
+ justify-self: center;
+}
+
+.schedule-pass-station strong {
+ color: #62788c;
+ font-size: 10px;
+}
+
+.schedule-pass-station>span:last-child {
+ color: #71879a;
+ font-size: 10px;
+ font-weight: 700;
+}
+
+@media (max-width: 560px) {
+ .wide-dialog:has(.schedule-list) {
+  padding: 17px;
+ }
+
+ .schedule-summary {
+  gap: 6px;
+ }
+
+ .schedule-stat {
+  padding: 10px 5px;
+ }
+
+ .schedule-stat strong {
+  font-size: 18px;
+ }
+
+ .schedule-stat span {
+  font-size: 9px;
+ }
+
+ .schedule-intermediate {
+  margin-left: 26px;
+ }
+
+ .schedule-intermediate summary {
+  flex-wrap: wrap;
+ }
+
+ .schedule-intermediate summary small {
+  display: none;
+ }
+
+ .schedule-times {
+  gap: 20px;
+ }
+}

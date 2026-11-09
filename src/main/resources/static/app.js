@@ -260,9 +260,114 @@ $("authForm").addEventListener("submit",async e=>{
  catch(err){toast(err.message);}finally{btn.disabled=false;renderAuthMode();}
 });
 async function openSchedule(trainNumber){
- openModal("scheduleModal");$("scheduleTitle").textContent="Train "+trainNumber;$("scheduleMeta").textContent="Loading complete route…";$("scheduleList").innerHTML='<div class="loading-state">Loading route stops…</div>';
- try{const stops=await api(`/api/trains/${encodeURIComponent(trainNumber)}/schedule?from=${encodeURIComponent(state.from.code)}&to=${encodeURIComponent(state.to.code)}`);if(!Array.isArray(stops)||!stops.length)throw new Error("No route stops found.");$("scheduleTitle").textContent=`${stops[0].trainName||"Train"} · ${trainNumber}`;$("scheduleMeta").textContent=`${stops[0].sourceName||""} (${stops[0].sourceCode||""}) → ${stops[0].destinationName||""} (${stops[0].destinationCode||""})`;$("scheduleSummary").textContent=`${stops.length} scheduled stops · Boarding at ${state.from.name} · Destination ${state.to.name}`;$("scheduleList").innerHTML=stops.map(s=>`<div class="schedule-stop"><div><strong>${esc(s.stationName)}</strong><small>${esc(s.stationCode)} · Stop ${esc(s.sequenceNumber)} · Day ${esc(s.journeyDay)}</small></div><span>${time(s.arrivalTime)}</span><span>${time(s.departureTime)}</span></div>`).join("");}
- catch(e){$("scheduleList").innerHTML=`<div class="empty-state">${esc(e.message)}</div>`;}
+ openModal("scheduleModal");
+ $("scheduleTitle").textContent="Train "+trainNumber;
+ $("scheduleMeta").textContent="Loading complete route…";
+ $("scheduleList").innerHTML='<div class="loading-state">Loading route stops…</div>';
+
+ try {
+  const stops = await api(`/api/trains/${encodeURIComponent(trainNumber)}/schedule?from=${encodeURIComponent(state.from.code)}&to=${encodeURIComponent(state.to.code)}`);
+  if (!Array.isArray(stops) || !stops.length) throw new Error("No route stops found.");
+
+  $("scheduleTitle").textContent=`${stops[0].trainName || "Train"} · ${trainNumber}`;
+  $("scheduleMeta").textContent=`${stops[0].sourceName || ""} (${stops[0].sourceCode || ""}) → ${stops[0].destinationName || ""} (${stops[0].destinationCode || ""})`;
+
+  function haltMinutes(stop) {
+   const arrival = mins(stop.arrivalTime);
+   const departure = mins(stop.departureTime);
+   if (arrival === null || departure === null) return null;
+   return Math.max(0, departure - arrival);
+  }
+
+  function isHalt(stop, index) {
+   return index === 0 || index === stops.length - 1 || (haltMinutes(stop) !== null && haltMinutes(stop) >= 2);
+  }
+
+  function haltLabel(stop, index) {
+   if (index === 0) return "Origin station";
+   if (index === stops.length - 1) return "Destination station";
+   const duration = haltMinutes(stop);
+   return `${duration} min halt`;
+  }
+
+  function stationCard(stop, index) {
+   const duration = haltMinutes(stop);
+   return `
+    <div class="schedule-halt">
+     <div class="schedule-timeline-marker"><span></span></div>
+     <div class="schedule-halt-content">
+      <div class="schedule-halt-top">
+       <div>
+        <strong>${esc(stop.stationName || "Station")}</strong>
+        <small>${esc(stop.stationCode || "")} · ${haltLabel(stop, index)}</small>
+       </div>
+       <span class="schedule-day">Day ${esc(stop.journeyDay || 1)}</span>
+      </div>
+      <div class="schedule-times">
+       <div><small>ARRIVAL</small><b>${time(stop.arrivalTime)}</b></div>
+       <div><small>DEPARTURE</small><b>${time(stop.departureTime)}</b></div>
+       ${duration !== null && index !== 0 && index !== stops.length - 1
+         ? `<div><small>HALT</small><b>${duration} min</b></div>` : ""}
+      </div>
+     </div>
+    </div>`;
+  }
+
+  let html = "";
+  let haltCount = 0;
+  let passingCount = 0;
+  let index = 0;
+
+  while (index < stops.length) {
+   if (!isHalt(stops[index], index)) {
+    index++;
+    continue;
+   }
+
+   const currentIndex = index;
+   html += stationCard(stops[index], index);
+   haltCount++;
+
+   const intermediate = [];
+   let next = index + 1;
+
+   while (next < stops.length && !isHalt(stops[next], next)) {
+    intermediate.push(stops[next]);
+    next++;
+   }
+
+   if (intermediate.length) {
+    passingCount += intermediate.length;
+    html += `
+     <details class="schedule-intermediate">
+      <summary>
+       <span class="schedule-intermediate-icon">＋</span>
+       <span>View ${intermediate.length} intermediate ${intermediate.length === 1 ? "station" : "stations"}</span>
+       <small>${esc(stops[currentIndex].stationName)} → ${esc(stops[next].stationName)}</small>
+      </summary>
+      <div class="schedule-intermediate-list">
+       ${intermediate.map(stop => `
+        <div class="schedule-pass-station">
+         <span class="schedule-pass-dot"></span>
+         <div><strong>${esc(stop.stationName || "Station")}</strong><small>${esc(stop.stationCode || "")} · Day ${esc(stop.journeyDay || 1)}</small></div>
+         <span>${time(stop.arrivalTime)}</span>
+        </div>`).join("")}
+      </div>
+     </details>`;
+   }
+
+   index = next;
+  }
+
+  $("scheduleSummary").innerHTML = `
+   <div class="schedule-stat"><strong>${haltCount}</strong><span>Halt stations</span></div>
+   <div class="schedule-stat"><strong>${passingCount}</strong><span>Intermediate stations</span></div>
+   <div class="schedule-stat"><strong>${stops.length}</strong><span>Total route stations</span></div>`;
+
+  $("scheduleList").innerHTML = html;
+ } catch(e) {
+  $("scheduleList").innerHTML=`<div class="empty-state">${esc(e.message)}</div>`;
+ }
 }
 document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closeModal(b.dataset.close)));
 document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)closeModal(o.id);}));

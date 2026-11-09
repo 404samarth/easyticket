@@ -1,190 +1,220 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#102b4e" />
-  <meta name="description" content="Search Indian trains, compare journey timings and explore complete train routes with EasyTicket." />
-  <title>EasyTicket — Find your train</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4f7fb">
+  <meta name="description" content="Search Indian trains, compare classes and book your journey with EasyTicket.">
+  <title>EasyTicket — Train Booking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div class="top-strip"><span class="live-dot"></span> YOUR JOURNEY, MADE EASIER <span class="strip-divider">|</span> Search across thousands of train routes</div>
-
-  <header class="site-header">
+  <header class="topbar">
     <a class="brand" href="/" aria-label="EasyTicket home">
-      <span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="3" y="5" width="34" height="29" rx="9" fill="currentColor"/><path d="M12 14h16M12 20h12M12 26h8" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="13" cy="34" r="2.2" fill="currentColor"/><circle cx="27" cy="34" r="2.2" fill="currentColor"/></svg></span>
-      <span class="brand-name">easy<span>ticket</span><small>SMART RAIL SEARCH</small></span>
+      <span class="brand-icon">e</span><span>easy<span class="brand-blue">ticket</span><small>INDIAN RAIL BOOKING</small></span>
     </a>
-    <nav class="main-nav" aria-label="Main navigation">
-      <a class="active" href="#search-section">Train search</a>
-      <a href="#how-it-works">How it works</a>
-      <a href="#about">About</a>
+    <nav class="nav-links" id="navLinks">
+      <a class="active" href="#searchPanel" id="navBookNow">Book Now</a>
+      <a href="#bookingHistorySection" id="navBookingHistory">Booking History</a>
+      <a href="#transactionHistorySection" id="navTransactionHistory">Transaction History</a>
+      <a href="#cancellationHistorySection" id="navCancellationHistory">Cancellation History</a>
+      <a href="#howItWorks">How it works</a>
     </nav>
-    <button class="header-cta" id="authButton" type="button">Login / Register <span>↗</span></button>
-    <button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
+    <div class="top-actions">
+      <button class="icon-btn" id="accountButton" title="Account" aria-label="Account">♙</button>
+      <button class="login-btn" id="authButton">Login / Register</button>
+    </div>
+    <button class="mobile-menu" id="mobileMenu" aria-label="Toggle navigation">☰</button>
   </header>
 
-  <main>
-    <section class="hero" id="search-section">
-      <div class="hero-pattern"></div>
-      <div class="hero-content">
-        <div class="eyebrow"><span class="eyebrow-line"></span> INDIA'S RAIL NETWORK, AT YOUR FINGERTIPS</div>
-        <h1>Every journey<br />starts with <em>a search.</em></h1>
-        <p class="hero-copy">Find trains between stations, compare timings and explore the complete route before you travel.</p>
-        <div class="hero-note"><span class="note-icon">✦</span> Simple. Clear. Smarter train discovery.</div>
+  <main class="page-shell">
+    <section class="welcome-row">
+      <div>
+        <p class="eyebrow">YOUR NEXT JOURNEY STARTS HERE</p>
+        <h1>Find your train. <span>Book with ease.</span></h1>
+        <p class="welcome-copy">Compare train timings, check class-wise simulated availability and book your journey.</p>
       </div>
-      <div class="hero-orbit orbit-one"></div><div class="hero-orbit orbit-two"></div>
-      <div class="hero-train-art" aria-hidden="true"><div class="track-line"></div><div class="train-shape"><div class="train-window"></div><div class="train-window"></div><div class="train-window"></div><div class="train-front"></div><i></i><i></i></div><span class="art-star star-a">✦</span><span class="art-star star-b">✧</span></div>
+      <div class="welcome-art" aria-hidden="true"><div class="sun"></div><div class="rail-track"></div><div class="mini-train"><i></i><i></i><i></i></div></div>
     </section>
 
-    <section class="search-wrap" aria-label="Search trains">
-      <form class="search-card" id="searchForm" autocomplete="off">
-        <div class="search-card-heading"><div><span class="section-kicker">PLAN YOUR TRIP</span><h2>Where would you like to go?</h2></div><span class="search-tag"><span class="live-dot"></span> TRAIN SEARCH</span></div>
-        <div class="search-fields">
-          <div class="station-field" id="fromField">
+    <section class="search-panel" id="searchPanel">
+      <div class="panel-heading"><div><span class="eyebrow">PLAN YOUR JOURNEY</span><h2>Where do you want to go?</h2></div><span class="secure-label">✦ EASY SEARCH</span></div>
+      <form id="searchForm" autocomplete="off">
+        <div class="search-grid">
+          <div class="field station-field" id="fromField">
             <label for="fromInput">FROM</label>
-            <div class="input-shell"><span class="field-symbol origin-symbol">●</span><input id="fromInput" type="text" placeholder="Enter source station" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="fromSuggestions" /><span class="field-hint">Origin</span></div>
-            <input id="fromCode" type="hidden" />
-            <div class="suggestions" id="fromSuggestions" role="listbox"></div>
+            <div class="input-wrap"><span>⌖</span><input id="fromInput" placeholder="Source station" role="combobox" aria-autocomplete="list" aria-expanded="false"><b>Origin</b></div>
+            <input id="fromCode" type="hidden"><div class="suggestions" id="fromSuggestions" role="listbox"></div>
           </div>
-          <button type="button" class="swap-button" id="swapStations" aria-label="Swap source and destination" title="Swap stations">⇄</button>
-          <div class="station-field" id="toField">
+          <button type="button" class="swap-btn" id="swapStations" title="Swap stations">⇄</button>
+          <div class="field station-field" id="toField">
             <label for="toInput">TO</label>
-            <div class="input-shell"><span class="field-symbol destination-symbol">◎</span><input id="toInput" type="text" placeholder="Enter destination station" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="toSuggestions" /><span class="field-hint">Destination</span></div>
-            <input id="toCode" type="hidden" />
-            <div class="suggestions" id="toSuggestions" role="listbox"></div>
+            <div class="input-wrap"><span>⚑</span><input id="toInput" placeholder="Destination station" role="combobox" aria-autocomplete="list" aria-expanded="false"><b>Destination</b></div>
+            <input id="toCode" type="hidden"><div class="suggestions" id="toSuggestions" role="listbox"></div>
           </div>
-          <div class="date-field">
+          <div class="field">
             <label for="journeyDate">JOURNEY DATE</label>
-            <div class="input-shell"><span class="field-symbol calendar-symbol">▦</span><input id="journeyDate" type="date" /></div>
+            <div class="input-wrap"><span>▦</span><input id="journeyDate" type="date" required></div>
           </div>
-          <button class="search-button" id="searchButton" type="submit"><span>Search trains</span><b>→</b></button>
+          <div class="field">
+            <label for="passengerCount">PASSENGERS</label>
+            <div class="input-wrap"><span>♙</span><select id="passengerCount"><option value="1">1 Adult</option><option value="2">2 Adults</option><option value="3">3 Adults</option><option value="4">4 Adults</option><option value="5">5 Adults</option><option value="6">6 Adults</option></select></div>
+          </div>
+          <div class="field">
+            <label for="category">CATEGORY</label>
+            <div class="input-wrap"><span>▤</span><select id="category"><option value="GENERAL">General</option><option value="TATKAL">Tatkal</option><option value="SENIOR_CITIZEN">Senior Citizen</option></select></div>
+          </div>
+          <button class="search-btn" type="submit" id="searchButton"><span>Search trains</span><b>⌕</b></button>
         </div>
-        <div class="form-foot"><span><b>ⓘ</b> Select a station from the suggestions to ensure an accurate search.</span><span class="dataset-foot">Powered by railway timetable data</span></div>
+        <p class="search-note">Select a station from the suggestions. Seat availability and fares are simulated for this academic project.</p>
       </form>
     </section>
 
-    <section class="results-section" id="resultsSection" hidden>
-      <div class="results-topline"><div><span class="section-kicker">YOUR SEARCH RESULTS</span><h2 id="resultsTitle">Available trains</h2><p id="resultsSubtitle" class="results-subtitle"></p></div><button class="modify-search" id="modifySearch">↻ Modify search</button></div>
-      <div class="results-toolbar"><div class="results-count" id="resultsCount">Searching trains…</div><div class="toolbar-controls"><label for="typeFilter">Train type</label><select id="typeFilter"><option value="all">All types</option></select><label for="sortBy">Sort by</label><select id="sortBy"><option value="departure">Departure</option><option value="arrival">Arrival</option><option value="duration">Shortest duration</option></select></div></div>
-      <div id="trainResults" class="train-results"></div>
-    </section>
+    <section class="results-layout" id="resultsSection" hidden>
+      <aside class="filters">
+        <div class="filter-head"><h3>Filters</h3><button id="resetFilters" type="button">Reset</button></div>
+        <div class="filter-group"><h4>Departure time</h4>
+          <label class="check-row"><input type="checkbox" name="timeFilter" value="morning"> Morning <span>06:00–12:00</span></label>
+          <label class="check-row"><input type="checkbox" name="timeFilter" value="afternoon"> Afternoon <span>12:00–18:00</span></label>
+          <label class="check-row"><input type="checkbox" name="timeFilter" value="night"> Evening / night <span>18:00–06:00</span></label>
+        </div>
+        <div class="filter-group"><h4>Train type</h4><select id="typeFilter" class="filter-select"><option value="all">All train types</option></select></div>
+        <div class="filter-group"><h4>Sort results</h4><select id="sortBy" class="filter-select"><option value="departure">Departure time</option><option value="arrival">Arrival time</option><option value="duration">Shortest duration</option></select></div>
+        <div class="filter-tip"><strong>Travel tip</strong><p>Open a train card to compare available classes and simulated fares before booking.</p></div>
+      </aside>
 
-    <section class="trust-section" id="how-it-works">
-      <div class="trust-heading"><span class="section-kicker">BUILT FOR BETTER JOURNEYS</span><h2>Know your route.<br /><em>Travel with clarity.</em></h2><p>Everything you need to understand your train journey, without the clutter.</p></div>
-      <div class="feature-grid">
-        <article class="feature-card"><div class="feature-icon blue-icon">⌕</div><h3>Search with ease</h3><p>Find stations by name or station code with helpful suggestions.</p><span class="feature-number">01</span></article>
-        <article class="feature-card"><div class="feature-icon mint-icon">◷</div><h3>Compare timings</h3><p>See departure, arrival and journey duration for matching trains.</p><span class="feature-number">02</span></article>
-        <article class="feature-card"><div class="feature-icon peach-icon">⌁</div><h3>Explore full routes</h3><p>Open the complete timetable and identify your boarding and destination stops.</p><span class="feature-number">03</span></article>
+      <div class="results-main">
+        <div class="results-heading">
+          <div><span class="eyebrow">MATCHING JOURNEYS</span><h2 id="resultsTitle">Available trains</h2><p id="resultsSubtitle"></p></div>
+          <div class="results-count" id="resultsCount">0 trains found</div>
+        </div>
+        <div id="trainResults" class="train-results"></div>
       </div>
     </section>
 
-    <section class="about-band" id="about"><div class="about-mark">e</div><div><span class="section-kicker">ABOUT EASYTICKET</span><h2>Railway information, made easier to explore.</h2><p>EasyTicket helps you discover trains and understand their routes using a structured railway timetable dataset.</p></div><div class="about-stat"><strong>8,990</strong><span>STATIONS IN DATASET</span></div><div class="about-stat"><strong>5,208</strong><span>TRAINS IN DATASET</span></div></section>
+    <section class="booking-history-section" id="bookingHistorySection" hidden>
+      <div class="history-heading">
+        <div>
+          <span class="eyebrow">YOUR JOURNEY RECORDS</span>
+          <h2>Booking History</h2>
+          <p>View your tickets, passengers and payment information.</p>
+        </div>
+        <button type="button" class="secondary-btn" id="refreshBookingHistory">Refresh</button>
+      </div>
+      <div id="bookingHistoryList">
+        <div class="loading-state">Your bookings will appear here.</div>
+      </div>
+    </section>
+
+
+    <section class="transaction-history-section" id="cancellationHistorySection" hidden>
+      <div class="history-heading">
+        <div>
+          <span class="eyebrow">YOUR CANCELLED JOURNEYS</span>
+          <h2>Cancellation History</h2>
+          <p>Review cancelled tickets and their simulated refund records.</p>
+        </div>
+        <button type="button" class="secondary-btn" id="refreshCancellationHistory">Refresh</button>
+      </div>
+      <div id="cancellationHistoryList">
+        <div class="loading-state">Your cancellation records will appear here.</div>
+      </div>
+    </section>
+
+    <section class="transaction-history-section" id="transactionHistorySection" hidden>
+      <div class="history-heading">
+        <div>
+          <span class="eyebrow">YOUR PAYMENT RECORDS</span>
+          <h2>Transaction History</h2>
+          <p>Review your payment transactions and their associated journeys.</p>
+        </div>
+        <button type="button" class="secondary-btn" id="refreshTransactionHistory">Refresh</button>
+      </div>
+      <div id="transactionHistoryList">
+        <div class="loading-state">Your transactions will appear here.</div>
+      </div>
+    </section>
+
+    <section class="how-section" id="howItWorks">
+      <div><span class="eyebrow">A SIMPLER WAY TO TRAVEL</span><h2>Plan it. Compare it.<br><span>Book it.</span></h2><p>EasyTicket brings train discovery and a guided educational booking flow into one place.</p></div>
+      <div class="how-cards">
+        <article><b>01</b><h3>Search trains</h3><p>Find trains using station names or codes and your journey date.</p></article>
+        <article><b>02</b><h3>Compare classes</h3><p>Expand a train to view class-wise simulated seats and fare.</p></article>
+        <article><b>03</b><h3>Book securely</h3><p>Enter passenger details, review your booking and receive a PNR.</p></article>
+      </div>
+    </section>
+    <footer><a class="brand footer-brand" href="/"><span class="brand-icon">e</span><span>easy<span class="brand-blue">ticket</span><small>INDIAN RAIL BOOKING</small></span></a><span>Educational railway booking project · Timetable and inventory are simulated/dataset-based.</span></footer>
   </main>
 
-  <footer class="site-footer"><a class="footer-brand" href="/">easy<span>ticket</span></a><span>Train discovery, made simple.</span><span class="footer-disclaimer">Timetable information is dataset-based and may not reflect live railway updates.</span><span>© <span id="year"></span> EasyTicket</span></footer>
+  <!-- Full route -->
+  <div class="overlay" id="scheduleModal" hidden><section class="dialog wide-dialog">
+    <div class="dialog-head"><div><span class="eyebrow">COMPLETE TRAIN ROUTE</span><h2 id="scheduleTitle">Train schedule</h2><p id="scheduleMeta"></p></div><button class="close-btn" data-close="scheduleModal">×</button></div>
+    <div id="scheduleSummary" class="schedule-summary"></div><div class="schedule-list-head"><span>STATION</span><span>ARRIVAL</span><span>DEPARTURE</span></div><div id="scheduleList" class="schedule-list"></div>
+  </section></div>
 
-  <div class="modal-backdrop" id="scheduleModal" hidden>
-    <section class="schedule-modal" role="dialog" aria-modal="true" aria-labelledby="scheduleTitle">
-      <div class="modal-header"><div><span class="section-kicker">COMPLETE TRAIN ROUTE</span><h2 id="scheduleTitle">Train schedule</h2><p id="scheduleMeta"></p></div><button class="modal-close" id="closeSchedule" aria-label="Close schedule">×</button></div>
-      <div class="schedule-summary" id="scheduleSummary"></div>
-      <div class="schedule-list-heading"><span>STATION & STOP</span><span>ARRIVAL</span><span>DEPARTURE</span></div>
-      <div class="schedule-list" id="scheduleList"></div>
-      <div class="schedule-footnote">This is the complete route available in the timetable dataset. Please verify current timings with the railway operator before travelling.</div>
-    </section>
-  </div>
+  <!-- Login / registration -->
+  <div class="overlay" id="authModal" hidden><section class="dialog">
+    <div class="dialog-head"><div><span class="eyebrow">EASYTICKET ACCOUNT</span><h2 id="authTitle">Welcome back</h2><p id="authSubtitle">Log in to continue with your booking.</p></div><button class="close-btn" data-close="authModal">×</button></div>
+    <form id="authForm" class="stack-form">
+      <div id="registerFields" hidden><label>Full name<input name="fullName" autocomplete="name"></label><label>Phone number<input name="phone" inputmode="numeric" autocomplete="tel"></label></div>
+      <label>Email address<input name="email" type="email" required autocomplete="email"></label>
+      <label>Password<input name="password" type="password" required minlength="8" autocomplete="current-password"></label>
+      <button class="primary-btn" id="authSubmit">Log in</button>
+      <p class="switch-auth" id="authSwitch">New to EasyTicket? <button type="button" id="toggleAuthMode">Create an account</button></p>
+    </form>
+  </section></div>
 
-  <!-- Authentication modal -->
-  <div class="modal-backdrop" id="authModal" hidden>
-    <section class="schedule-modal booking-modal" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <div><span class="section-kicker">EASYTICKET ACCOUNT</span><h2 id="authTitle">Welcome back</h2><p id="authSubtitle">Log in to continue with your journey.</p></div>
-        <button class="modal-close" type="button" data-close-modal="authModal">×</button>
-      </div>
-      <form id="authForm" class="booking-form">
-        <div id="registerFields" hidden>
-          <label>Full name<input name="fullName" type="text" autocomplete="name" /></label>
-          <label>Phone number<input name="phone" type="tel" autocomplete="tel" /></label>
-        </div>
-        <label>Email address<input name="email" type="email" required autocomplete="email" /></label>
-        <label>Password<input name="password" type="password" required minlength="8" autocomplete="current-password" /></label>
-        <button class="search-button booking-submit" id="authSubmit" type="submit">Log in</button>
-        <p class="auth-switch" id="authSwitch">New to EasyTicket? <button type="button" id="toggleAuthMode">Create an account</button></p>
-      </form>
-    </section>
-  </div>
+  <!-- Availability details -->
+  <div class="overlay" id="availabilityModal" hidden><section class="dialog">
+    <div class="dialog-head"><div><span class="eyebrow">SELECT YOUR CLASS</span><h2 id="availabilityTitle">Availability & fare</h2><p id="availabilityTrain"></p></div><button class="close-btn" data-close="availabilityModal">×</button></div>
+    <div class="stack-form">
+      <div id="classAvailability" class="class-availability"></div>
+      <div class="booking-note">Availability and fare are simulated. Senior Citizen category currently uses General inventory; no concession is applied.</div>
+      <button class="primary-btn" id="continueBooking" disabled>Continue to passenger details →</button>
+    </div>
+  </section></div>
 
-  <!-- Availability and class selection modal -->
-  <div class="modal-backdrop" id="availabilityModal" hidden>
-    <section class="schedule-modal booking-modal" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <div><span class="section-kicker">SELECT YOUR JOURNEY</span><h2>Class & availability</h2><p id="availabilityTrain"></p></div>
-        <button class="modal-close" type="button" data-close-modal="availabilityModal">×</button>
-      </div>
-      <div class="booking-form">
-        <label>Travel class
-          <select id="travelClass">
-            <option value="SL">Sleeper (SL)</option><option value="3A">AC 3 Tier (3A)</option>
-            <option value="2A">AC 2 Tier (2A)</option><option value="1A">AC First Class (1A)</option>
-            <option value="3E">AC 3 Economy (3E)</option><option value="CC">AC Chair Car (CC)</option>
-            <option value="EC">Executive Chair Car (EC)</option><option value="2S">Second Sitting (2S)</option>
-          </select>
-        </label>
-        <label>Quota
-          <select id="travelQuota">
-            <option value="GENERAL">General</option>
-            <option value="TATKAL">Tatkal</option>
-            <option value="PREMIUM_TATKAL">Premium Tatkal</option>
-          </select>
-        </label>
-        <div id="inventoryResult" class="inventory-result">Select a class to check simulated availability.</div>
-        <button class="search-button booking-submit" id="continueBooking" type="button" disabled>Continue to passenger details →</button>
-        <p class="booking-disclaimer">Availability and fares are simulated for this academic project, not live railway inventory.</p>
-      </div>
-    </section>
-  </div>
+  <!-- Passenger details -->
+  <div class="overlay" id="passengerModal" hidden><section class="dialog">
+    <div class="dialog-head"><div><span class="eyebrow">PASSENGER INFORMATION</span><h2>Passenger details</h2><p id="passengerJourney"></p></div><button class="close-btn" data-close="passengerModal">×</button></div>
+    <form id="passengerForm" class="stack-form">
+      <div id="passengerFields"></div>
+      <div class="passenger-actions"><button type="button" class="text-btn" id="addPassenger">+ Add passenger</button><span id="passengerLimit">Maximum 6 passengers</span></div>
+      <label>Payment method<select id="paymentMethod"><option value="DEMO">Demo payment</option><option value="UPI">UPI (simulated)</option><option value="CARD">Card (simulated)</option><option value="NETBANKING">Net banking (simulated)</option></select></label>
+      <div id="fareSummary" class="fare-summary"></div>
+      <button class="primary-btn" id="confirmBooking">Confirm & pay (simulated)</button>
+      <p class="fine-print">No real payment is collected. This is an educational booking simulation.</p>
+    </form>
+  </section></div>
 
-  <!-- Passenger details modal -->
-  <div class="modal-backdrop" id="passengerModal" hidden>
-    <section class="schedule-modal booking-modal" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <div><span class="section-kicker">PASSENGER INFORMATION</span><h2>Passenger details</h2><p id="passengerJourney"></p></div>
-        <button class="modal-close" type="button" data-close-modal="passengerModal">×</button>
-      </div>
-      <form id="passengerForm" class="booking-form">
-        <div id="passengerFields"></div>
-        <button type="button" class="modify-search" id="addPassenger">+ Add passenger</button>
-        <label>Payment method
-          <select id="paymentMethod"><option value="DEMO">Demo payment</option><option value="UPI">UPI (simulated)</option><option value="CARD">Card (simulated)</option><option value="NETBANKING">Net banking (simulated)</option></select>
-        </label>
-        <div id="bookingFareSummary" class="inventory-result"></div>
-        <button class="search-button booking-submit" id="confirmBooking" type="submit">Confirm & pay</button>
-        <p class="booking-disclaimer">No real payment will be collected. This is an educational booking simulation.</p>
-      </form>
-    </section>
-  </div>
+  <!-- Ticket -->
+  <div class="overlay" id="ticketModal" hidden><section class="dialog">
+    <div class="dialog-head"><div><span class="success-kicker">✓ BOOKING CONFIRMED</span><h2>Your ticket</h2><p>Your booking has been saved in the EasyTicket database.</p></div><button class="close-btn" data-close="ticketModal">×</button></div>
+    <div id="ticketDetails"></div><div class="ticket-actions"><button class="primary-btn" id="printTicket">Print ticket</button><button class="secondary-btn" data-close="ticketModal">Close</button></div>
+  </section></div>
 
-  <!-- Booking confirmation modal -->
-  <div class="modal-backdrop" id="ticketModal" hidden>
-    <section class="schedule-modal booking-modal" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <div><span class="section-kicker">BOOKING CONFIRMED</span><h2>Your ticket</h2><p>Your simulated booking was saved successfully.</p></div>
-        <button class="modal-close" type="button" data-close-modal="ticketModal">×</button>
-      </div>
-      <div id="ticketDetails" class="booking-form"></div>
-      <div class="ticket-actions">
-        <button class="search-button" id="printTicket" type="button">Print ticket</button>
-        <button class="modify-search" type="button" data-close-modal="ticketModal">Close</button>
-      </div>
-    </section>
-  </div>
+  <!-- Account drawer -->
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="account-drawer" id="accountDrawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div><span class="eyebrow">EASYTICKET ACCOUNT</span><h2 id="drawerUserName">My account</h2></div>
+      <button type="button" class="close-btn" id="closeAccountDrawer">×</button>
+    </div>
+    <div class="drawer-menu">
+      <button type="button" id="drawerBookNow">Book Ticket</button>
+      <button type="button" id="drawerBookingHistory">Booking History</button>
+      <button type="button" id="drawerTransactionHistory">Transaction History</button>
+      <button type="button" id="drawerCancellationHistory">Cancellation History</button>
+      <button type="button" disabled>Change Password · Coming soon</button>
+      <button type="button" disabled>Account Manager · Coming soon</button>
+    </div>
+    <button type="button" class="drawer-logout" id="drawerLogout">Log out</button>
+  </aside>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
   <script src="/app.js"></script>
 </body>
 </html>

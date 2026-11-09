@@ -1,285 +1,618 @@
-const $ = (id) => document.getElementById(id);
-const state = { from: null, to: null, trains: [], toastTimer: null };
+const $ = id => document.getElementById(id);
+const state = {
+  from:null,to:null,trains:[],toastTimer:null,authMode:"login",user:null,
+  selectedTrain:null,selectedClass:null,selectedInventory:null,passengers:[],
+  category:"GENERAL",inventoryCache:new Map()
+};
+const CLASSES=[
+  {code:"SL",name:"Sleeper"},{code:"3A",name:"AC 3 Tier"},{code:"CC",name:"AC Chair Car"},
+  {code:"2A",name:"AC 2 Tier"},{code:"1A",name:"AC First Class"},{code:"3E",name:"AC 3 Economy"}
+];
+const today=new Date(),localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);
+$("journeyDate").value=localDate;$("journeyDate").min=localDate;
 
-const today = new Date();
-const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-$('journeyDate').value = localDate;
-$('journeyDate').min = localDate;
-$('year').textContent = new Date().getFullYear();
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function toast(msg){const el=$("toast");el.textContent=msg;el.classList.add("show");clearTimeout(state.toastTimer);state.toastTimer=setTimeout(()=>el.classList.remove("show"),3000);}
+function money(v){return "₹"+Number(v||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});}
+function openModal(id){$(id).hidden=false;document.body.style.overflow="hidden";}
+function closeModal(id){$(id).hidden=true;if(!document.querySelector(".overlay:not([hidden])"))document.body.style.overflow="";}
+function apiError(data,status){return data?.message||data?.detail||data?.error||`Request failed (${status})`;}
+async function api(url,options={}){const res=await fetch(url,{credentials:"same-origin",headers:{"Content-Type":"application/json",...(options.headers||{})},...options});let data;const text=await res.text();try{data=text?JSON.parse(text):{};}catch{data={message:text};}if(!res.ok)throw new Error(apiError(data,res.status));return data;}
 
-function showToast(message) {
-  const toast = $('toast');
-  toast.textContent = message;
-  toast.classList.add('show');
-  clearTimeout(state.toastTimer);
-  state.toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+function setupAutocomplete(which){
+ const input=$(which+"Input"),code=$(which+"Code"),box=$(which+"Suggestions");let timer,items=[];
+ const close=()=>{box.classList.remove("open");input.setAttribute("aria-expanded","false");};
+ const select=s=>{input.value=`${s.name} (${s.code})`;code.value=s.code;state[which]=s;close();};
+ input.addEventListener("input",()=>{clearTimeout(timer);state[which]=null;code.value="";const q=input.value.trim();if(q.length<2){close();return;}box.innerHTML='<div class="suggestion-message">Searching stations…</div>';box.classList.add("open");timer=setTimeout(async()=>{try{items=await api("/api/stations?query="+encodeURIComponent(q));box.innerHTML=items.length?items.map((s,i)=>`<button type="button" class="suggestion-item" data-i="${i}"><span class="suggestion-pin">⌖</span><span class="suggestion-main"><span class="suggestion-name">${esc(s.name)}</span><span class="suggestion-meta">${esc(s.state||"Indian Railways station")}</span></span><span class="suggestion-code">${esc(s.code)}</span></button>`).join(""):'<div class="suggestion-message">No matching stations found.</div>';box.querySelectorAll("[data-i]").forEach(b=>b.addEventListener("click",()=>select(items[+b.dataset.i])));}catch(e){box.innerHTML=`<div class="suggestion-message">${esc(e.message)}</div>`;}},220);});
+ input.addEventListener("keydown",e=>{if(e.key==="Escape")close();if(e.key==="Enter"&&box.classList.contains("open")){e.preventDefault();box.querySelector(".suggestion-item")?.click();}});
+ document.addEventListener("click",e=>{if(!e.target.closest("#"+which+"Field"))close();});
 }
+setupAutocomplete("from");setupAutocomplete("to");
+$("swapStations").addEventListener("click",()=>{[state.from,state.to]=[state.to,state.from];$("fromInput").value=state.from?`${state.from.name} (${state.from.code})`:"";$("fromCode").value=state.from?.code||"";$("toInput").value=state.to?`${state.to.name} (${state.to.code})`:"";$("toCode").value=state.to?.code||"";});
 
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+function mins(t){if(!t)return null;const p=String(t).split(":").map(Number);return p.length<2||p.some(Number.isNaN)?null:p[0]*60+p[1];}
+function time(t){const m=mins(t);if(m===null)return"—";const h=Math.floor(m/60)%24;return`${String(h).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;}
+function duration(t){const a=mins(t.departureTime),b=mins(t.arrivalTime);if(a===null||b===null)return"—";let d=((Number(t.endDay||t.startDay||1)-Number(t.startDay||1))*1440)+b-a;if(d<0&&!t.endDay)d+=1440;if(d<0)return"—";return`${Math.floor(d/60)}h ${d%60}m`;}
+function dayDate(date,day){const d=new Date(date+"T00:00:00");d.setDate(d.getDate()+Math.max(0,(Number(day)||1)-1));return d.toLocaleDateString("en-IN",{day:"2-digit",month:"short"});}
+function selectedCategory(){const c=$("category").value;return c==="TATKAL"?"TATKAL":"GENERAL";}
+function timeMatch(t){const chosen=[...document.querySelectorAll('[name="timeFilter"]:checked')].map(x=>x.value);if(!chosen.length)return true;const m=mins(t.departureTime);if(m===null)return false;return chosen.some(x=>x==="morning"?m>=360&&m<720:x==="afternoon"?m>=720&&m<1080:m>=1080||m<360);}
+function renderResults(){
+ const type=$("typeFilter").value,sort=$("sortBy").value;
+ let list=state.trains.filter(t=>(type==="all"||(t.trainType||"Other")===type)&&timeMatch(t));
+ list.sort((a,b)=>sort==="duration"?durationMinutes(a)-durationMinutes(b):sort==="arrival"?(mins(a.arrivalTime)??99999)-(mins(b.arrivalTime)??99999):(mins(a.departureTime)??99999)-(mins(b.departureTime)??99999));
+ $("resultsCount").textContent=`${list.length} ${list.length===1?"train":"trains"} found`;
+ if(!list.length){$("trainResults").innerHTML='<div class="empty-state"><h3>No matching trains</h3><p>Try changing the filters or searching another date.</p></div>';return;}
+ $("trainResults").innerHTML=list.map(t=>{
+  const n=esc(t.trainNumber),id="train-"+String(t.trainNumber).replace(/[^a-zA-Z0-9]/g,"");
+  return `<article class="train-card" id="${id}">
+   <div class="train-card-top"><div class="train-identity"><span class="train-logo">▤</span><div><div class="train-name">${esc(t.trainName||"Train")}</div><div class="train-number">Train no. ${n}</div></div></div><span class="train-type">${esc(t.trainType||"Express")}</span></div>
+   <div class="journey-line"><div class="station-time"><strong>${time(t.departureTime)}</strong><span>${esc(t.boardingStation||state.from.name)}</span><small>${esc(state.from.code)} · ${dayDate($("journeyDate").value,t.startDay)}</small></div><div class="duration"><b>${duration(t)}</b>Journey duration</div><div class="station-time end"><strong>${time(t.arrivalTime)}</strong><span>${esc(t.arrivalStation||state.to.name)}</span><small>${esc(state.to.code)} · ${dayDate($("journeyDate").value,t.endDay)}</small></div></div>
+   <div class="card-bottom"><div class="class-chips">${CLASSES.map(c=>`<button class="class-chip" data-class="${c.code}" data-train="${n}" type="button">${c.code}</button>`).join("")}</div><div class="card-actions"><button class="schedule-link" data-schedule="${n}" type="button">Full route ↗</button><span class="expand-hint">Choose class to check availability</span></div></div>
+   <div class="availability-panel" id="availability-${id}"><div class="availability-head"><strong>Class-wise availability & fare</strong><small>SIMULATED INVENTORY</small></div><div class="availability-options"><div class="loading-state">Choose a class above to check seats and fare.</div></div></div>
+  </article>`;
+ }).join("");
+ $("trainResults").querySelectorAll(".class-chip").forEach(b=>b.addEventListener("click",()=>checkClass(b.dataset.train,b.dataset.class,b)));
+ $("trainResults").querySelectorAll("[data-schedule]").forEach(b=>b.addEventListener("click",()=>openSchedule(b.dataset.schedule)));
 }
-
-function setupStationAutocomplete(which) {
-  const input = $(which + 'Input');
-  const codeInput = $(which + 'Code');
-  const box = $(which + 'Suggestions');
-  let timer;
-  let activeItems = [];
-
-  function close() {
-    box.classList.remove('open');
-    input.setAttribute('aria-expanded', 'false');
-  }
-
-  function selectStation(station) {
-    input.value = `${station.name} (${station.code})`;
-    codeInput.value = station.code;
-    state[which] = station;
-    close();
-  }
-
-  function render(items, message) {
-    activeItems = items;
-    if (!items.length) {
-      box.innerHTML = `<div class="suggestion-message">${escapeHtml(message || 'No matching stations found.')}</div>`;
-    } else {
-      box.innerHTML = items.map((station, index) => `
-        <button type="button" class="suggestion-item" role="option" data-index="${index}">
-          <span class="suggestion-pin">⌖</span>
-          <span class="suggestion-main"><span class="suggestion-name">${escapeHtml(station.name)}</span><span class="suggestion-meta">${escapeHtml(station.state || 'Indian Railways station')}</span></span>
-          <span class="suggestion-code">${escapeHtml(station.code)}</span>
-        </button>`).join('');
-      box.querySelectorAll('.suggestion-item').forEach((button) => {
-        button.addEventListener('click', () => selectStation(activeItems[Number(button.dataset.index)]));
-      });
-    }
-    box.classList.add('open');
-    input.setAttribute('aria-expanded', 'true');
-  }
-
-  input.addEventListener('input', () => {
-    clearTimeout(timer);
-    state[which] = null;
-    codeInput.value = '';
-    const query = input.value.trim();
-    if (query.length < 2) { close(); return; }
-    box.innerHTML = '<div class="suggestion-message">Searching stations…</div>';
-    box.classList.add('open');
-    input.setAttribute('aria-expanded', 'true');
-    timer = setTimeout(async () => {
-      try {
-        const response = await fetch(`/api/stations?query=${encodeURIComponent(query)}`);
-        if (!response.ok) throw new Error('Station search is unavailable.');
-        const stations = await response.json();
-        render(stations, 'No stations found. Try another name or station code.');
-      } catch (error) {
-        render([], error.message || 'Could not load stations. Please try again.');
-      }
-    }, 220);
-  });
-
-  input.addEventListener('focus', () => {
-    if (input.value.trim().length >= 2 && box.innerHTML.trim()) box.classList.add('open');
-  });
-  input.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') close();
-    if (event.key === 'Enter' && box.classList.contains('open')) {
-      const first = box.querySelector('.suggestion-item');
-      if (first) { event.preventDefault(); first.click(); }
-    }
-  });
-  document.addEventListener('click', (event) => {
-    if (!event.target.closest('#' + which + 'Field')) close();
-  });
-  return { close, selectStation };
-}
-
-const fromAutocomplete = setupStationAutocomplete('from');
-const toAutocomplete = setupStationAutocomplete('to');
-
-$('swapStations').addEventListener('click', () => {
-  const from = state.from;
-  const to = state.to;
-  state.from = to;
-  state.to = from;
-  $('fromInput').value = to ? `${to.name} (${to.code})` : '';
-  $('fromCode').value = to?.code || '';
-  $('toInput').value = from ? `${from.name} (${from.code})` : '';
-  $('toCode').value = from?.code || '';
+function durationMinutes(t){const a=mins(t.departureTime),b=mins(t.arrivalTime);if(a===null||b===null)return 999999;let d=(Number(t.endDay||t.startDay||1)-Number(t.startDay||1))*1440+b-a;return d<0?d+1440:d;}
+$("searchForm").addEventListener("submit",async e=>{
+ e.preventDefault();if(!state.from||!$("fromCode").value){toast("Choose your source station from suggestions.");$("fromInput").focus();return;}if(!state.to||!$("toCode").value){toast("Choose your destination station from suggestions.");$("toInput").focus();return;}if(state.from.code===state.to.code){toast("From and To stations must be different.");return;}
+ const date=$("journeyDate").value;if(!date){toast("Choose a journey date.");return;}
+ const btn=$("searchButton");btn.disabled=true;btn.querySelector("span").textContent="Searching…";$("resultsSection").hidden=false;$("resultsTitle").textContent=`${state.from.name} → ${state.to.name}`;$("resultsSubtitle").textContent=new Date(date+"T00:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"});$("trainResults").innerHTML='<div class="loading-state">Searching the railway timetable…</div>';
+ try{state.trains=await api(`/api/trains/search?from=${encodeURIComponent(state.from.code)}&to=${encodeURIComponent(state.to.code)}&date=${encodeURIComponent(date)}`);const types=[...new Set(state.trains.map(t=>t.trainType).filter(Boolean))].sort();$("typeFilter").innerHTML='<option value="all">All train types</option>'+types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");renderResults();$("resultsSection").scrollIntoView({behavior:"smooth",block:"start"});}
+ catch(err){$("trainResults").innerHTML=`<div class="empty-state"><h3>Train search failed</h3><p>${esc(err.message)}</p></div>`;$("resultsCount").textContent="Search unavailable";}
+ finally{btn.disabled=false;btn.querySelector("span").textContent="Search trains";}
 });
+$("typeFilter").addEventListener("change",renderResults);$("sortBy").addEventListener("change",renderResults);
+document.querySelectorAll('[name="timeFilter"]').forEach(x=>x.addEventListener("change",renderResults));
+$("resetFilters").addEventListener("click",()=>{document.querySelectorAll('[name="timeFilter"]').forEach(x=>x.checked=false);$("typeFilter").value="all";$("sortBy").value="departure";renderResults();});
 
-function parseTime(value) {
-  if (!value) return null;
-  const parts = String(value).split(':').map(Number);
-  if (parts.length < 2 || parts.some(Number.isNaN)) return null;
-  return parts[0] * 60 + parts[1];
+function inventoryUrl(train,cls){const quota=selectedCategory();return `/api/inventory?trainNumber=${encodeURIComponent(train.trainNumber)}&from=${encodeURIComponent(state.from.code)}&to=${encodeURIComponent(state.to.code)}&date=${encodeURIComponent($("journeyDate").value)}&travelClass=${encodeURIComponent(cls)}&quota=${encodeURIComponent(quota)}`;}
+async function checkClass(trainNumber,cls,button){
+ const train=state.trains.find(t=>String(t.trainNumber)===String(trainNumber));if(!train)return;
+ const card=button.closest(".train-card"),panel=card.querySelector(".availability-panel"),opts=panel.querySelector(".availability-options");
+ card.querySelectorAll(".class-chip").forEach(b=>b.classList.toggle("selected",b===button));panel.classList.add("open");opts.innerHTML='<div class="loading-state">Checking simulated availability…</div>';
+ try{
+  const category=$("category").value,quota=selectedCategory(),key=[trainNumber,cls,$("journeyDate").value,quota].join("|");
+  const data=await api(inventoryUrl(train,cls));state.inventoryCache.set(key,data);
+  opts.innerHTML=`<button type="button" class="availability-option" data-book-class="${cls}" data-train="${esc(trainNumber)}"><strong>${cls} · ${CLASSES.find(c=>c.code===cls).name}</strong><span>${Number(data.availableSeats)} seats available</span><small>Fare per passenger</small><em>${money(data.farePerPassenger)}</em><small>Choose this class →</small></button>`;
+  opts.querySelector("[data-book-class]").addEventListener("click",()=>beginBooking(train,cls,data,category));
+ }catch(err){opts.innerHTML=`<div class="empty-state"><p>${esc(err.message)}</p></div>`;}
+}
+function beginBooking(train,cls,data,category){
+ state.selectedTrain=train;state.selectedClass=cls;state.selectedInventory=data;state.category=category;
+ $("availabilityTitle").textContent=`${cls} · ${CLASSES.find(c=>c.code===cls).name}`;
+ $("availabilityTrain").textContent=`${train.trainNumber} · ${train.trainName}`;
+ $("classAvailability").innerHTML=`<div class="class-choice active"><label><input type="radio" checked> ${cls} · ${CLASSES.find(c=>c.code===cls).name}</label><span>${data.availableSeats} seats available</span><strong>${money(data.farePerPassenger)} / person</strong></div>`;
+ $("continueBooking").disabled=Number(data.availableSeats)<1;openModal("availabilityModal");
+}
+$("continueBooking").addEventListener("click",async()=>{
+ try{await refreshUser();if(!state.user){closeModal("availabilityModal");state.authMode="login";renderAuthMode();openModal("authModal");toast("Please log in before booking.");return;}
+ closeModal("availabilityModal");const count=Math.min(6,Math.max(1,Number($("passengerCount").value)||1));state.passengers=Array.from({length:count},()=>({name:"",age:"",gender:"",berthPreference:"NO_PREFERENCE"}));renderPassengerFields();$("passengerJourney").textContent=`${state.selectedTrain.trainName} · ${state.from.name} to ${state.to.name}`;$("fareSummary").innerHTML=`${count} passenger(s) × ${money(state.selectedInventory.farePerPassenger)}<br><strong>Total ${money(count*Number(state.selectedInventory.farePerPassenger))}</strong>`;openModal("passengerModal");
+ }catch(e){toast(e.message);}
+});
+function renderPassengerFields(){
+ $("passengerFields").innerHTML=state.passengers.map((p,i)=>`<div class="passenger-card" data-passenger="${i}"><h3>Passenger ${i+1}</h3><label>Full name<input required maxlength="100" data-p="name" value="${esc(p.name)}" placeholder="Passenger full name"></label><div class="passenger-grid"><label>Age<input required type="number" min="1" max="120" data-p="age" value="${esc(p.age)}" placeholder="Age"></label><label>Gender<select required data-p="gender"><option value="">Select</option><option value="MALE" ${p.gender==="MALE"?"selected":""}>Male</option><option value="FEMALE" ${p.gender==="FEMALE"?"selected":""}>Female</option><option value="OTHER" ${p.gender==="OTHER"?"selected":""}>Other</option></select></label></div><label>Berth preference<select data-p="berthPreference"><option value="NO_PREFERENCE" ${p.berthPreference==="NO_PREFERENCE"?"selected":""}>No preference</option><option value="LOWER" ${p.berthPreference==="LOWER"?"selected":""}>Lower</option><option value="MIDDLE" ${p.berthPreference==="MIDDLE"?"selected":""}>Middle</option><option value="UPPER" ${p.berthPreference==="UPPER"?"selected":""}>Upper</option><option value="SIDE_LOWER" ${p.berthPreference==="SIDE_LOWER"?"selected":""}>Side lower</option><option value="SIDE_UPPER" ${p.berthPreference==="SIDE_UPPER"?"selected":""}>Side upper</option></select></label></div>`).join("");
+ $("passengerFields").querySelectorAll(".passenger-card").forEach((card,i)=>card.querySelectorAll("[data-p]").forEach(el=>el.addEventListener("change",()=>{state.passengers[i][el.dataset.p]=el.value;})));
+ $("addPassenger").disabled=state.passengers.length>=6;$("passengerLimit").textContent=`${state.passengers.length}/6 passengers`;
+}
+$("addPassenger").addEventListener("click",()=>{if(state.passengers.length>=6)return;state.passengers.push({name:"",age:"",gender:"",berthPreference:"NO_PREFERENCE"});renderPassengerFields();const n=state.passengers.length;$("fareSummary").innerHTML=`${n} passenger(s) × ${money(state.selectedInventory.farePerPassenger)}<br><strong>Total ${money(n*Number(state.selectedInventory.farePerPassenger))}</strong>`;});
+$("passengerForm").addEventListener("submit",async e=>{
+ e.preventDefault();const cards=[...$("passengerFields").querySelectorAll(".passenger-card")];
+ const passengers=cards.map(card=>({name:card.querySelector('[data-p="name"]').value.trim(),age:Number(card.querySelector('[data-p="age"]').value),gender:card.querySelector('[data-p="gender"]').value,berthPreference:card.querySelector('[data-p="berthPreference"]').value}));
+ if(passengers.some(p=>!p.name||!p.age||p.age<1||p.age>120||!p.gender)){toast("Complete all passenger details correctly.");return;}
+ const btn=$("confirmBooking");btn.disabled=true;btn.textContent="Processing simulated payment…";
+ try{
+  const payload={trainNumber:String(state.selectedTrain.trainNumber),from:state.from.code,to:state.to.code,journeyDate:$("journeyDate").value,travelClass:state.selectedClass,quota:selectedCategory(),paymentMethod:$("paymentMethod").value,passengers};
+  const result=await api("/api/bookings",{method:"POST",body:JSON.stringify(payload)});
+  renderTicket(result,passengers);closeModal("passengerModal");openModal("ticketModal");toast("Booking confirmed. Your PNR is "+result.pnr);
+ }catch(err){if(/log in/i.test(err.message)){closeModal("passengerModal");openModal("authModal");}toast(err.message);}
+ finally{btn.disabled=false;btn.textContent="Confirm & pay (simulated)";}
+});
+function renderTicket(r,passengers){
+ const pnr=esc(r.pnr);
+ $("ticketDetails").innerHTML=`<div class="ticket-grid"><div class="pnr-cell"><small>YOUR 10-DIGIT PNR</small><strong>${pnr}</strong><small>CONFIRMED · SIMULATED PAYMENT</small></div><div class="ticket-cell"><small>Train</small><strong>${esc(state.selectedTrain.trainName)} (${esc(r.trainNumber)})</strong></div><div class="ticket-cell"><small>Journey date</small><strong>${new Date(r.journeyDate+"T00:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</strong></div><div class="ticket-cell"><small>From</small><strong>${esc(state.from.name)} (${esc(r.from)})</strong></div><div class="ticket-cell"><small>To</small><strong>${esc(state.to.name)} (${esc(r.to)})</strong></div><div class="ticket-cell"><small>Class / Category</small><strong>${esc(r.travelClass)} / ${esc(state.category==="SENIOR_CITIZEN"?"Senior Citizen":r.quota)}</strong></div><div class="ticket-cell"><small>Passengers</small><strong>${passengers.length}</strong></div><div class="ticket-cell"><small>Fare per passenger</small><strong>${money(r.farePerPassenger)}</strong></div><div class="ticket-cell"><small>Total fare</small><strong>${money(r.totalFare)}</strong></div><div class="ticket-cell"><small>Payment</small><strong>${esc(r.paymentStatus)} · ${esc(r.paymentType)}</strong></div><div class="ticket-cell"><small>Booking ID</small><strong>${esc(r.bookingId)}</strong></div><div class="ticket-cell"><small>Passengers</small><strong>${passengers.map(p=>esc(p.name)).join(", ")}</strong></div></div>`;
+}
+$("printTicket").addEventListener("click",()=>window.print());
+
+async function refreshUser(){try{state.user=await api("/api/auth/me");$("authButton").textContent=state.user.fullName?.split(" ")[0]||"My account";}catch{state.user=null;$("authButton").textContent="Login / Register";}return state.user;}
+function renderAuthMode(){const reg=state.authMode==="register";$("authTitle").textContent=reg?"Create your account":"Welcome back";$("authSubtitle").textContent=reg?"Register to book your journey.":"Log in to continue with your booking.";$("registerFields").hidden=!reg;$("registerFields").querySelectorAll("input").forEach(i=>i.required=reg);$("authForm").elements.password.autocomplete=reg?"new-password":"current-password";$("authSubmit").textContent=reg?"Create account":"Log in";$("authSwitch").innerHTML=reg?'Already registered? <button type="button" id="toggleAuthMode">Log in</button>':'New to EasyTicket? <button type="button" id="toggleAuthMode">Create an account</button>';$("toggleAuthMode").addEventListener("click",()=>{state.authMode=reg?"login":"register";renderAuthMode();});}
+function openAccountDrawer(){
+ $("accountDrawer").classList.add("open");
+ $("drawerBackdrop").classList.add("open");
+ $("accountDrawer").setAttribute("aria-hidden","false");
+}
+function closeAccountDrawer(){
+ $("accountDrawer").classList.remove("open");
+ $("drawerBackdrop").classList.remove("open");
+ $("accountDrawer").setAttribute("aria-hidden","true");
+}
+async function openAccount(){
+ await refreshUser();
+ if(state.user){
+  $("drawerUserName").textContent=state.user.fullName||"My account";
+  openAccountDrawer();
+ }else{
+  state.authMode="login";
+  renderAuthMode();
+  openModal("authModal");
+ }
+}
+$("authButton").addEventListener("click",openAccount);
+$("accountButton").addEventListener("click",openAccount);
+$("closeAccountDrawer").addEventListener("click",closeAccountDrawer);
+$("drawerBackdrop").addEventListener("click",closeAccountDrawer);
+$("drawerBookNow").addEventListener("click",()=>{
+ closeAccountDrawer();
+ $("searchPanel").scrollIntoView({behavior:"smooth"});
+});
+$("drawerLogout").addEventListener("click",async()=>{
+ try{
+  await api("/api/auth/logout",{method:"POST"});
+  state.user=null;
+  $("authButton").textContent="Login / Register";
+  closeAccountDrawer();
+  toast("Logged out successfully.");
+ }catch(e){toast(e.message);}
+});
+$("authForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const form=e.currentTarget;
+ const f=new FormData(form),reg=state.authMode==="register";
+ const payload=reg?{fullName:f.get("fullName"),phone:f.get("phone"),email:f.get("email"),password:f.get("password")}:{email:f.get("email"),password:f.get("password")};
+ const btn=$("authSubmit");btn.disabled=true;btn.textContent="Please wait…";
+ try{state.user=await api(reg?"/api/auth/register":"/api/auth/login",{method:"POST",body:JSON.stringify(payload)});$("authButton").textContent=state.user.fullName?.split(" ")[0]||"My account";closeModal("authModal");toast(reg?"Account created successfully.":"Login successful.");}
+ catch(err){toast(err.message);}finally{btn.disabled=false;renderAuthMode();}
+});
+async function openSchedule(trainNumber){
+ openModal("scheduleModal");$("scheduleTitle").textContent="Train "+trainNumber;$("scheduleMeta").textContent="Loading complete route…";$("scheduleList").innerHTML='<div class="loading-state">Loading route stops…</div>';
+ try{const stops=await api(`/api/trains/${encodeURIComponent(trainNumber)}/schedule?from=${encodeURIComponent(state.from.code)}&to=${encodeURIComponent(state.to.code)}`);if(!Array.isArray(stops)||!stops.length)throw new Error("No route stops found.");$("scheduleTitle").textContent=`${stops[0].trainName||"Train"} · ${trainNumber}`;$("scheduleMeta").textContent=`${stops[0].sourceName||""} (${stops[0].sourceCode||""}) → ${stops[0].destinationName||""} (${stops[0].destinationCode||""})`;$("scheduleSummary").textContent=`${stops.length} scheduled stops · Boarding at ${state.from.name} · Destination ${state.to.name}`;$("scheduleList").innerHTML=stops.map(s=>`<div class="schedule-stop"><div><strong>${esc(s.stationName)}</strong><small>${esc(s.stationCode)} · Stop ${esc(s.sequenceNumber)} · Day ${esc(s.journeyDay)}</small></div><span>${time(s.arrivalTime)}</span><span>${time(s.departureTime)}</span></div>`).join("");}
+ catch(e){$("scheduleList").innerHTML=`<div class="empty-state">${esc(e.message)}</div>`;}
+}
+document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closeModal(b.dataset.close)));
+document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)closeModal(o.id);}));
+document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".overlay:not([hidden])").forEach(o=>closeModal(o.id));});
+$("mobileMenu").addEventListener("click",()=>$("navLinks").classList.toggle("open"));
+refreshUser();
+
+
+// Booking History
+function historyDate(value) {
+ if (!value) return "—";
+ const d = new Date(String(value).length === 10 ? value + "T00:00:00" : value);
+ return Number.isNaN(d.getTime())
+  ? String(value)
+  : d.toLocaleDateString("en-IN", {day:"2-digit",month:"short",year:"numeric"});
 }
 
-function journeyMinutes(train) {
-  const start = parseTime(train.departureTime);
-  const end = parseTime(train.arrivalTime);
-  if (start === null || end === null) return null;
-  const startDay = Number(train.startDay) || 1;
-  const endDay = Number(train.endDay) || startDay;
-  let duration = (endDay - startDay) * 1440 + end - start;
-  if (duration < 0 && !train.endDay) duration += 1440;
-  return duration >= 0 ? duration : null;
+function historyDateTime(value) {
+ if (!value) return "—";
+ const d = new Date(value);
+ return Number.isNaN(d.getTime())
+  ? String(value)
+  : d.toLocaleString("en-IN", {day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
 }
 
-function formatTime(value) {
-  if (!value) return '—';
-  const mins = parseTime(value);
-  if (mins === null) return '—';
-  const hour = Math.floor(mins / 60) % 24;
-  const minute = mins % 60;
-  const suffix = hour >= 12 ? 'PM' : 'AM';
-  return `${String(hour % 12 || 12).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${suffix}`;
-}
+function renderBookingHistory(bookings) {
+ const container = $("bookingHistoryList");
 
-function formatDuration(minutes) {
-  if (minutes === null) return 'Duration unavailable';
-  const days = Math.floor(minutes / 1440);
-  const hours = Math.floor((minutes % 1440) / 60);
-  const mins = minutes % 60;
-  if (days) return `${days}d ${hours}h ${mins}m`;
-  return `${hours}h ${mins}m`;
-}
+ if (!bookings.length) {
+  container.innerHTML = `
+   <div class="empty-state">
+    <h3>No bookings yet</h3>
+    <p>Your confirmed tickets will appear here after you book a journey.</p>
+    <button type="button" class="primary-btn history-book-btn" id="historyBookNow">Find trains</button>
+   </div>`;
+  $("historyBookNow").addEventListener("click", showBookNow);
+  return;
+ }
 
-function renderResults() {
-  const type = $('typeFilter').value;
-  const sort = $('sortBy').value;
-  let results = state.trains.filter((train) => type === 'all' || (train.trainType || 'Other') === type);
-  results = [...results].sort((a, b) => {
-    if (sort === 'duration') return (journeyMinutes(a) ?? Infinity) - (journeyMinutes(b) ?? Infinity);
-    if (sort === 'arrival') return (parseTime(a.arrivalTime) ?? Infinity) - (parseTime(b.arrivalTime) ?? Infinity);
-    return (parseTime(a.departureTime) ?? Infinity) - (parseTime(b.departureTime) ?? Infinity);
-  });
-  $('resultsCount').textContent = `${results.length} ${results.length === 1 ? 'train' : 'trains'} found`;
-  const container = $('trainResults');
-  if (!results.length) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">⌕</div><h3>No trains match this filter</h3><p>Try selecting another train type.</p></div>`;
-    return;
-  }
-  container.innerHTML = results.map((train) => {
-    const duration = journeyMinutes(train);
-    const distance = Number(train.endDistance) - Number(train.startDistance);
-    const distanceText = Number.isFinite(distance) && distance > 0 ? `${Math.round(distance)} km` : 'Timetable route';
-    const trainNumber = escapeHtml(train.trainNumber);
-    return `<article class="train-card">
-      <div class="train-main">
-        <div class="train-title-row"><span class="train-title">${escapeHtml(train.trainName)}</span><span class="train-number">${trainNumber}</span><span class="train-type">${escapeHtml(train.trainType || 'Train')}</span></div>
-        <div class="journey-times">
-          <div class="time-block"><strong>${formatTime(train.departureTime)}</strong><span>${escapeHtml(train.boardingStation || state.from?.name || '')}</span><small>${escapeHtml(state.from?.code || '')} · Day ${escapeHtml(train.startDay || '—')}</small></div>
-          <div class="journey-duration">${formatDuration(duration)}<span>Journey duration</span></div>
-          <div class="time-block"><strong>${formatTime(train.arrivalTime)}</strong><span>${escapeHtml(train.arrivalStation || state.to?.name || '')}</span><small>${escapeHtml(state.to?.code || '')} · Day ${escapeHtml(train.endDay || '—')}</small></div>
-        </div>
+ container.innerHTML = bookings.map(b => {
+  const status = String(b.bookingStatus || "UNKNOWN").toUpperCase();
+  const passengers = Array.isArray(b.passengers) ? b.passengers : [];
+  const timeline = Array.isArray(b.statusHistory) ? b.statusHistory : [];
+  const paymentStatus = b.paymentStatus || "NOT AVAILABLE";
+
+  return `
+   <article class="history-card">
+    <div class="history-card-top">
+     <div>
+      <span class="history-pnr-label">PNR</span>
+      <strong class="history-pnr">${esc(b.pnr)}</strong>
+     </div>
+     <span class="history-status ${status === "CONFIRMED" ? "confirmed" : status === "CANCELLED" ? "cancelled" : ""}">${esc(status)}</span>
+    </div>
+
+    <div class="history-train">
+     <div>
+      <strong>${esc(b.trainName || "Train " + b.trainNumber)}</strong>
+      <small>Train no. ${esc(b.trainNumber)}</small>
+     </div>
+     <span class="history-class">${esc(b.travelClass)} · ${esc(b.quota)}</span>
+    </div>
+
+    <div class="history-route">
+     <div><strong>${esc(b.fromCode)}</strong><span>${esc(b.fromName)}</span></div>
+     <span class="history-route-arrow">→</span>
+     <div><strong>${esc(b.toCode)}</strong><span>${esc(b.toName)}</span></div>
+    </div>
+
+    <div class="history-summary">
+     <div><small>Journey date</small><strong>${esc(historyDate(b.journeyDate))}</strong></div>
+     <div><small>Passengers</small><strong>${esc(b.passengerCount)}</strong></div>
+     <div><small>Total fare</small><strong>${esc(money(b.totalFare))}</strong></div>
+    </div>
+
+    <details class="history-details">
+     <summary>View booking details</summary>
+     <div class="history-detail-content">
+      <h4>Passenger details</h4>
+      ${passengers.length ? passengers.map((p,i) => `
+       <div class="history-passenger">
+        <strong>${i+1}. ${esc(p.passengerName)}</strong>
+        <span>${esc(p.age)} years · ${esc(p.gender)} · ${esc(p.berthPreference || "No preference")}</span>
+        <small>Seat: ${esc(p.seatNumber || "Not assigned")} · ${esc(p.passengerStatus || "—")}</small>
+       </div>`).join("") : '<p class="history-muted">No passenger details available.</p>'}
+
+      <h4>Payment information</h4>
+      <div class="history-info-grid">
+       <div><small>Payment status</small><strong>${esc(paymentStatus)}</strong></div>
+       <div><small>Payment method</small><strong>${esc(b.paymentMethod || "—")}</strong></div>
+       <div><small>Amount</small><strong>${esc(money(b.paidAmount ?? b.totalFare))}</strong></div>
+       <div><small>Transaction reference</small><strong>${esc(b.transactionReference || "—")}</strong></div>
+       <div><small>Paid at</small><strong>${esc(historyDateTime(b.paidAt))}</strong></div>
+       <div><small>Booked at</small><strong>${esc(historyDateTime(b.bookedAt))}</strong></div>
       </div>
-      <div class="train-actions"><div class="route-distance">${distanceText}</div><button class="schedule-button" data-train="${trainNumber}">View full schedule&nbsp; →</button></div>
-    </article>`;
-  }).join('');
-  container.querySelectorAll('.schedule-button').forEach((button) => {
-    button.addEventListener('click', () => openSchedule(button.dataset.train));
+
+      <h4>Booking status timeline</h4>
+      ${timeline.length ? `<div class="history-timeline">${timeline.map(t => `
+       <div class="history-timeline-item">
+        <strong>${esc(t.newStatus)}</strong>
+        <span>${esc(t.remarks || "")}</span>
+        <small>${esc(historyDateTime(t.changedAt))}</small>
+       </div>`).join("")}</div>` : '<p class="history-muted">No status updates available.</p>'}
+     </div>
+    </details>
+
+    <div class="history-card-actions">
+     <button type="button" class="secondary-btn" data-cancel-booking="${esc(b.bookingId)}" ${status !== "CONFIRMED" ? "disabled" : ""}>Cancel Ticket</button>
+     <button type="button" class="secondary-btn" data-transaction-booking="${esc(b.bookingId)}">Transaction Details</button>
+     <button type="button" class="secondary-btn" data-food-train>Food on Train</button>
+     <button type="button" class="secondary-btn" data-connecting-train>Book Connecting Train</button>
+    </div>
+   </article>`;
+ }).join("");
+
+ container.querySelectorAll("[data-cancel-booking]").forEach(button => {
+  button.addEventListener("click", () => cancelBooking(button.dataset.cancelBooking));
+ });
+
+ container.querySelectorAll("[data-transaction-booking]").forEach(button => {
+  button.addEventListener("click", () => showTransactionHistory(button.dataset.transactionBooking));
+ });
+
+ container.querySelectorAll("[data-food-train]").forEach(button => {
+  button.addEventListener("click", () => window.open("https://www.swiggy.com/", "_blank", "noopener,noreferrer"));
+ });
+
+ container.querySelectorAll("[data-connecting-train]").forEach(button => {
+  button.addEventListener("click", showBookNow);
+ });
+}
+
+async function cancelBooking(bookingId) {
+ const confirmed = window.confirm(
+  "Cancel this entire booking? All passengers on this PNR will be cancelled together. The refund shown by EasyTicket is simulated and will not be transferred to your bank."
+ );
+
+ if (!confirmed) return;
+
+ try {
+  const result = await api(`/api/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+   method: "POST"
   });
+
+  const refund = result?.refundAmount != null
+   ? money(result.refundAmount)
+   : "the booking amount";
+
+  toast(`Ticket cancelled. Simulated refund: ${refund}`);
+  await loadBookingHistory();
+ } catch (err) {
+  toast(err.message || "Unable to cancel this ticket.");
+ }
 }
 
-async function searchTrains(event) {
-  event.preventDefault();
-  if (!state.from || !$('fromCode').value) { showToast('Please choose your source station from the suggestions.'); $('fromInput').focus(); return; }
-  if (!state.to || !$('toCode').value) { showToast('Please choose your destination station from the suggestions.'); $('toInput').focus(); return; }
-  if (state.from.code === state.to.code) { showToast('Source and destination cannot be the same.'); return; }
-  const date = $('journeyDate').value;
-  if (!date) { showToast('Please select your journey date.'); return; }
+async function loadBookingHistory() {
+ const container = $("bookingHistoryList");
+ container.innerHTML = '<div class="loading-state">Loading your bookings…</div>';
 
-  const button = $('searchButton');
-  button.disabled = true;
-  button.querySelector('span').textContent = 'Searching…';
-  $('resultsSection').hidden = false;
-  $('resultsTitle').textContent = `${state.from.name} to ${state.to.name}`;
-  $('resultsSubtitle').textContent = new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  $('resultsCount').textContent = 'Finding matching trains…';
-  $('trainResults').innerHTML = '<div class="loading-state"><div class="spinner"></div>Searching the railway timetable…</div>';
-  $('typeFilter').innerHTML = '<option value="all">All types</option>';
-  try {
-    const url = `/api/trains/search?from=${encodeURIComponent(state.from.code)}&to=${encodeURIComponent(state.to.code)}&date=${encodeURIComponent(date)}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(detail || `Train search failed (${response.status}).`);
-    }
-    const trains = await response.json();
-    state.trains = Array.isArray(trains) ? trains : [];
-    const types = [...new Set(state.trains.map((train) => train.trainType).filter(Boolean))].sort();
-    types.forEach((trainType) => $('typeFilter').add(new Option(trainType, trainType)));
-    renderResults();
-    $('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } catch (error) {
-    state.trains = [];
-    $('resultsCount').textContent = 'Search could not be completed';
-    $('trainResults').innerHTML = `<div class="empty-state"><div class="empty-icon">!</div><h3>We couldn't load trains</h3><p>${escapeHtml(error.message || 'Please check that EasyTicket backend is running and try again.')}</p></div>`;
-  } finally {
-    button.disabled = false;
-    button.querySelector('span').textContent = 'Search trains';
-  }
+ try {
+  const bookings = await api("/api/bookings/history");
+  renderBookingHistory(Array.isArray(bookings) ? bookings : []);
+ } catch (err) {
+  container.innerHTML = `<div class="empty-state"><h3>Unable to load bookings</h3><p>${esc(err.message)}</p><button type="button" class="secondary-btn" id="retryBookingHistory">Try again</button></div>`;
+  $("retryBookingHistory").addEventListener("click", loadBookingHistory);
+ }
 }
 
-async function openSchedule(trainNumber) {
-  if (!state.from || !state.to) return;
-  $('scheduleModal').hidden = false;
-  document.body.style.overflow = 'hidden';
-  $('scheduleTitle').textContent = `Train ${trainNumber}`;
-  $('scheduleMeta').textContent = 'Loading complete route…';
-  $('scheduleSummary').innerHTML = '';
-  $('scheduleList').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading every station on this route…</div>';
-  try {
-    const url = `/api/trains/${encodeURIComponent(trainNumber)}/schedule?from=${encodeURIComponent(state.from.code)}&to=${encodeURIComponent(state.to.code)}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(detail || `Schedule unavailable (${response.status}).`);
-    }
-    const stops = await response.json();
-    if (!Array.isArray(stops) || !stops.length) throw new Error('No route stops were found for this train.');
-    const first = stops[0];
-    $('scheduleTitle').textContent = `${first.trainName || 'Train'} · ${trainNumber}`;
-    $('scheduleMeta').textContent = `${first.sourceName || 'Origin'} (${first.sourceCode || ''}) → ${first.destinationName || 'Destination'} (${first.destinationCode || ''})`;
-    $('scheduleSummary').innerHTML = `<span><strong>${stops.length}</strong> scheduled stops</span><span>Board at <strong>${escapeHtml(state.from.name)}</strong></span><span>Get down at <strong>${escapeHtml(state.to.name)}</strong></span>`;
-    $('scheduleList').innerHTML = stops.map((stop) => {
-      const boarding = Boolean(stop.boardingStop) || stop.stationCode === state.from.code;
-      const alighting = Boolean(stop.alightingStop) || stop.stationCode === state.to.code;
-      const labels = [boarding ? 'BOARDING' : '', alighting ? 'DESTINATION' : ''].filter(Boolean).join(' · ');
-      return `<div class="schedule-stop ${boarding || alighting ? 'highlight' : ''}">
-        <div class="station-cell"><span class="stop-marker"></span><span><strong>${escapeHtml(stop.stationName || 'Unknown station')}${labels ? `<span class="stop-badge">${labels}</span>` : ''}</strong><small>${escapeHtml(stop.stationCode || '—')} · Stop ${escapeHtml(stop.sequenceNumber ?? '—')} · Day ${escapeHtml(stop.journeyDay ?? '—')}</small></span></div>
-        <span class="stop-time">${formatTime(stop.arrivalTime)}</span><span class="stop-time">${formatTime(stop.departureTime)}</span>
-      </div>`;
-    }).join('');
-  } catch (error) {
-    $('scheduleList').innerHTML = `<div class="empty-state"><h3>Could not load this schedule</h3><p>${escapeHtml(error.message || 'Please try again.')}</p></div>`;
-  }
+async function showBookingHistory() {
+ closeAccountDrawer();
+ const user = await refreshUser();
+
+ if (!user) {
+  state.authMode = "login";
+  renderAuthMode();
+  openModal("authModal");
+  toast("Please log in to view your booking history.");
+  return;
+ }
+
+ $("bookingHistorySection").hidden = false;
+ $("transactionHistorySection").hidden = true;
+ $("cancellationHistorySection").hidden = true;
+ $("navCancellationHistory").classList.remove("active");
+ $("navTransactionHistory").classList.remove("active");
+ $("resultsSection").hidden = true;
+ $("howItWorks").hidden = true;
+ $("bookingHistorySection").scrollIntoView({behavior:"smooth", block:"start"});
+ $("navLinks").classList.remove("open");
+ $("navBookNow").classList.remove("active");
+ $("navBookingHistory").classList.add("active");
+
+ await loadBookingHistory();
 }
 
-function closeSchedule() {
-  $('scheduleModal').hidden = true;
-  document.body.style.overflow = '';
+function showBookNow() {
+ $("bookingHistorySection").hidden = true;
+ $("transactionHistorySection").hidden = true;
+ $("cancellationHistorySection").hidden = true;
+ $("navCancellationHistory").classList.remove("active");
+ $("navBookingHistory").classList.remove("active");
+ $("navTransactionHistory").classList.remove("active");
+ $("resultsSection").hidden = true;
+ $("howItWorks").hidden = false;
+ $("searchPanel").scrollIntoView({behavior:"smooth", block:"start"});
+ $("navLinks").classList.remove("open");
+ $("navBookingHistory").classList.remove("active");
+ $("navBookNow").classList.add("active");
 }
 
-$('searchForm').addEventListener('submit', searchTrains);
-$('typeFilter').addEventListener('change', renderResults);
-$('sortBy').addEventListener('change', renderResults);
-$('modifySearch').addEventListener('click', () => $('search-section').scrollIntoView({ behavior: 'smooth' }));
-$('closeSchedule').addEventListener('click', closeSchedule);
-$('scheduleModal').addEventListener('click', (event) => { if (event.target === $('scheduleModal')) closeSchedule(); });
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !$('scheduleModal').hidden) closeSchedule(); });
-$('mobileMenu').addEventListener('click', () => {
-  const nav = document.querySelector('.main-nav');
-  const isOpen = nav.style.display === 'flex';
-  nav.style.display = isOpen ? '' : 'flex';
-  nav.style.position = isOpen ? '' : 'absolute';
-  nav.style.top = isOpen ? '' : '67px';
-  nav.style.left = isOpen ? '' : '0';
-  nav.style.right = isOpen ? '' : '0';
-  nav.style.padding = isOpen ? '' : '18px 22px';
-  nav.style.background = isOpen ? '' : '#fff';
-  nav.style.flexDirection = isOpen ? '' : 'column';
-  nav.style.alignItems = isOpen ? '' : 'flex-start';
-  nav.style.boxShadow = isOpen ? '' : '0 12px 22px #102b4e18';
+$("navBookingHistory").addEventListener("click", e => {
+ e.preventDefault();
+ showBookingHistory();
 });
+
+$("navBookNow").addEventListener("click", e => {
+ e.preventDefault();
+ showBookNow();
+});
+
+$("drawerBookingHistory").addEventListener("click", showBookingHistory);
+$("refreshBookingHistory").addEventListener("click", loadBookingHistory);
+
+
+// Transaction History
+function renderTransactionHistory(transactions) {
+ const container = $("transactionHistoryList");
+
+ if (!transactions.length) {
+  container.innerHTML = `
+   <div class="empty-state">
+    <h3>No transactions yet</h3>
+    <p>Your payment records will appear here after you make a booking.</p>
+    <button type="button" class="primary-btn" id="transactionBookNow">Find trains</button>
+   </div>`;
+  $("transactionBookNow").addEventListener("click", showBookNow);
+  return;
+ }
+
+ container.innerHTML = transactions.map(t => {
+  const status = String(t.paymentStatus || "UNKNOWN").toUpperCase();
+  const statusClass = status === "SUCCESS" ? "success"
+    : status === "FAILED" ? "failed" : "";
+
+  return `
+   <article class="transaction-card" id="transaction-booking-${esc(t.bookingId)}">
+    <div class="transaction-card-top">
+     <div>
+      <span class="transaction-label">TRANSACTION REFERENCE</span>
+      <strong class="transaction-reference">${esc(t.transactionReference)}</strong>
+     </div>
+     <span class="transaction-status ${statusClass}">${esc(status)}</span>
+    </div>
+
+    <div class="transaction-amount">
+     <small>Amount paid</small>
+     <strong>${esc(money(t.amount))}</strong>
+    </div>
+
+    <div class="transaction-details-grid">
+     <div><small>Payment method</small><strong>${esc(t.paymentMethod || "—")}</strong></div>
+     <div><small>Payment date</small><strong>${esc(historyDateTime(t.paidAt))}</strong></div>
+     <div><small>PNR</small><strong>${esc(t.pnr || "—")}</strong></div>
+     <div><small>Booking status</small><strong>${esc(t.bookingStatus || "—")}</strong></div>
+    </div>
+
+    <div class="transaction-journey">
+     <div>
+      <strong>${esc(t.trainName || "Train " + t.trainNumber)}</strong>
+      <small>Train no. ${esc(t.trainNumber)} · ${esc(t.travelClass || "—")}</small>
+     </div>
+     <div class="transaction-route">
+      <span><strong>${esc(t.fromCode)}</strong><small>${esc(t.fromName)}</small></span>
+      <b>→</b>
+      <span><strong>${esc(t.toCode)}</strong><small>${esc(t.toName)}</small></span>
+     </div>
+     <small class="transaction-journey-date">Journey date: ${esc(historyDate(t.journeyDate))}</small>
+    </div>
+   </article>`;
+ }).join("");
+}
+
+async function loadTransactionHistory() {
+ const container = $("transactionHistoryList");
+ container.innerHTML = '<div class="loading-state">Loading your transactions…</div>';
+
+ try {
+  const transactions = await api("/api/transactions/history");
+  renderTransactionHistory(Array.isArray(transactions) ? transactions : []);
+ } catch (err) {
+  container.innerHTML = `
+   <div class="empty-state">
+    <h3>Unable to load transactions</h3>
+    <p>${esc(err.message)}</p>
+    <button type="button" class="secondary-btn" id="retryTransactionHistory">Try again</button>
+   </div>`;
+  $("retryTransactionHistory").addEventListener("click", loadTransactionHistory);
+ }
+}
+
+async function showTransactionHistory(bookingId = null) {
+ closeAccountDrawer();
+ const user = await refreshUser();
+
+ if (!user) {
+  state.authMode = "login";
+  renderAuthMode();
+  openModal("authModal");
+  toast("Please log in to view your transaction history.");
+  return;
+ }
+
+ $("bookingHistorySection").hidden = true;
+ $("transactionHistorySection").hidden = false;
+ $("cancellationHistorySection").hidden = true;
+ $("navCancellationHistory").classList.remove("active");
+ $("resultsSection").hidden = true;
+ $("howItWorks").hidden = true;
+
+ $("navLinks").classList.remove("open");
+ $("navBookNow").classList.remove("active");
+ $("navBookingHistory").classList.remove("active");
+ $("navTransactionHistory").classList.add("active");
+
+ $("transactionHistorySection").scrollIntoView({behavior:"smooth", block:"start"});
+ await loadTransactionHistory();
+
+ if (bookingId !== null) {
+  const target = $("transaction-booking-" + bookingId);
+  if (target) target.scrollIntoView({behavior:"smooth", block:"center"});
+  else toast("No transaction record was found for this booking.");
+ }
+}
+
+$("navTransactionHistory").addEventListener("click", e => {
+ e.preventDefault();
+ showTransactionHistory();
+});
+
+$("drawerTransactionHistory").addEventListener("click", showTransactionHistory);
+$("refreshTransactionHistory").addEventListener("click", loadTransactionHistory);
+
+
+// Cancellation History
+function renderCancellationHistory(cancellations) {
+ const container = $("cancellationHistoryList");
+
+ if (!cancellations.length) {
+  container.innerHTML = `
+   <div class="empty-state">
+    <h3>No cancelled tickets</h3>
+    <p>Your cancelled bookings and simulated refund records will appear here.</p>
+    <button type="button" class="primary-btn" id="cancellationBookNow">Find trains</button>
+   </div>`;
+  $("cancellationBookNow").addEventListener("click", showBookNow);
+  return;
+ }
+
+ container.innerHTML = cancellations.map(c => `
+  <article class="transaction-card">
+   <div class="transaction-card-top">
+    <div>
+     <span class="transaction-label">CANCELLATION REFERENCE</span>
+     <strong class="transaction-reference">${esc(c.cancellationReference)}</strong>
+    </div>
+    <span class="transaction-status success">${esc(c.refundStatus || "SIMULATED")}</span>
+   </div>
+
+   <div class="transaction-amount">
+    <small>Simulated refund amount</small>
+    <strong>${esc(money(c.refundAmount))}</strong>
+   </div>
+
+   <div class="transaction-details-grid">
+    <div><small>PNR</small><strong>${esc(c.pnr || "—")}</strong></div>
+    <div><small>Cancellation date</small><strong>${esc(historyDateTime(c.cancelledAt))}</strong></div>
+    <div><small>Journey date</small><strong>${esc(historyDate(c.journeyDate))}</strong></div>
+    <div><small>Passengers</small><strong>${esc(c.passengerCount)}</strong></div>
+    <div><small>Refund type</small><strong>Simulated · Not a real bank refund</strong></div>
+    <div><small>Class</small><strong>${esc(c.travelClass || "—")}</strong></div>
+   </div>
+
+   <div class="transaction-journey">
+    <strong>${esc(c.trainName || "Train " + c.trainNumber)}</strong>
+    <small>Train no. ${esc(c.trainNumber)}</small>
+    <div class="transaction-route">
+     <span><strong>${esc(c.fromCode)}</strong><small>${esc(c.fromName)}</small></span>
+     <b>→</b>
+     <span><strong>${esc(c.toCode)}</strong><small>${esc(c.toName)}</small></span>
+    </div>
+   </div>
+  </article>
+ `).join("");
+}
+
+async function loadCancellationHistory() {
+ const container = $("cancellationHistoryList");
+ container.innerHTML = '<div class="loading-state">Loading cancellation records…</div>';
+
+ try {
+  const cancellations = await api("/api/cancellations/history");
+  renderCancellationHistory(Array.isArray(cancellations) ? cancellations : []);
+ } catch (err) {
+  container.innerHTML = `
+   <div class="empty-state">
+    <h3>Unable to load cancellation history</h3>
+    <p>${esc(err.message)}</p>
+    <button type="button" class="secondary-btn" id="retryCancellationHistory">Try again</button>
+   </div>`;
+  $("retryCancellationHistory").addEventListener("click", loadCancellationHistory);
+ }
+}
+
+async function showCancellationHistory() {
+ closeAccountDrawer();
+ const user = await refreshUser();
+
+ if (!user) {
+  state.authMode = "login";
+  renderAuthMode();
+  openModal("authModal");
+  toast("Please log in to view your cancellation history.");
+  return;
+ }
+
+ $("bookingHistorySection").hidden = true;
+ $("transactionHistorySection").hidden = true;
+ $("cancellationHistorySection").hidden = false;
+ $("resultsSection").hidden = true;
+ $("howItWorks").hidden = true;
+
+ $("navLinks").classList.remove("open");
+ $("navBookNow").classList.remove("active");
+ $("navBookingHistory").classList.remove("active");
+ $("navTransactionHistory").classList.remove("active");
+ $("navCancellationHistory").classList.add("active");
+
+ $("cancellationHistorySection").scrollIntoView({behavior:"smooth", block:"start"});
+ await loadCancellationHistory();
+}
+
+$("navCancellationHistory").addEventListener("click", e => {
+ e.preventDefault();
+ showCancellationHistory();
+});
+
+$("drawerCancellationHistory").addEventListener("click", showCancellationHistory);
+$("refreshCancellationHistory").addEventListener("click", loadCancellationHistory);

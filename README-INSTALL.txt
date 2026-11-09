@@ -1,36 +1,43 @@
-EASYTICKET FRONTEND — INSTALLATION IN GITHUB CODESPACES
+EASYTICKET REDESIGNED FRONTEND — INSTALLATION
 
-This package is designed for the existing EasyTicket Spring Boot + MySQL project.
-It uses plain HTML, CSS and JavaScript. No React, npm, Node.js or separate frontend server is required.
+This package is built for the existing EasyTicket Spring Boot + MySQL project.
+It uses plain HTML, CSS and JavaScript. No npm, React or separate frontend server is required.
 
-FILES IN THIS PACKAGE
+FILES
 - src/main/resources/static/index.html
 - src/main/resources/static/style.css
 - src/main/resources/static/app.js
-- src/main/java/com/easyticket/controller/TrainController.java
 
-INSTALL
-1. Upload this ZIP into the root of your existing GitHub Codespace repository (the same folder that contains pom.xml).
-2. Open the Codespaces terminal and run:
-   unzip -o easyticket-frontend-package.zip -d .
-   (Use the actual uploaded ZIP filename if you renamed it.)
-3. The ZIP contains a corrected TrainController.java. It places the full schedule endpoint inside the controller class. It replaces only that Java controller file and adds the static frontend files.
-4. Compile:
+INSTALL IN YOUR EXISTING GITHUB CODESPACE
+1. Upload this ZIP into the root of your existing /workspaces/easyticket repository (the folder containing pom.xml).
+2. In the Codespaces terminal, run:
+   cd /workspaces/easyticket
+   unzip -o easyticket-redesigned-frontend.zip -d .
+3. This replaces only the three static frontend files. It does NOT replace Java controllers, database schema, .env, Docker data, or railway data.
+4. Check Java compilation:
    ./mvnw -DskipTests compile
-5. Start/restart Spring Boot with the existing .env credentials:
+5. Start the MySQL container if needed:
+   docker compose up -d
+6. Start Spring Boot using the existing .env:
    set -a
    source .env
    set +a
    export DB_USERNAME=easyticket_user
-   ./mvnw spring-boot:run
-6. In the Codespaces PORTS tab, open port 8080. The EasyTicket homepage should appear.
+   ./mvnw spring-boot:run -Dspring-boot.run.arguments=--server.port=8081
+7. Open port 8081 in the Codespaces PORTS tab.
 
-IMPORTANT
-- Do not delete or re-import the MySQL database.
-- Do not run docker compose down -v.
-- The frontend calls the existing same-origin APIs:
-  GET /api/stations?query=...
-  GET /api/trains/search?from=...&to=...&date=YYYY-MM-DD
-  GET /api/trains/{trainNumber}/schedule?from=...&to=...
-- The frontend does not invent live availability, fare, booking or PNR information. Those are not present in the supplied database/API.
-- Timetables are dataset-based; verify actual current railway information before travelling.
+FEATURES CONNECTED TO EXISTING APIs
+- Station autocomplete: GET /api/stations
+- Train search: GET /api/trains/search
+- Full train route: GET /api/trains/{trainNumber}/schedule
+- Simulated class inventory and fare: GET /api/inventory
+- Login/register/session/logout: /api/auth/*
+- Booking creation: POST /api/bookings
+- PNR ticket confirmation and browser printing
+
+IMPORTANT PROJECT LIMITATIONS
+- Availability, fares and payment are simulated, not official live IRCTC services.
+- Senior Citizen category currently uses GENERAL inventory because the supplied backend has no senior-citizen quota or concession calculation. No concession is applied.
+- Booking history, PNR lookup, cancellation/refund, admin train management and manual booking endpoints are not present in the current backend. The frontend does not pretend these work.
+- The booking endpoint accepts up to 6 passengers and class codes SL, 3A, CC, 2A, 1A, 3E are used here.
+- Do not delete or re-import the MySQL database. Never run docker compose down -v.

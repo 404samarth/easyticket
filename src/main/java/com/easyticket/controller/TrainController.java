@@ -1,4 +1,3 @@
-
 package com.easyticket.controller;
 
 import java.time.LocalDate;
@@ -7,10 +6,10 @@ import java.util.Map;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.PathVariable;
 
 @RestController
 @RequestMapping("/api/trains")
@@ -94,7 +93,6 @@ public class TrainController {
             date
         );
     }
-}
 
     @GetMapping("/{trainNumber}/schedule")
     public List<Map<String, Object>> getTrainSchedule(
@@ -118,14 +116,8 @@ public class TrainController {
                 s.departure_time AS departureTime,
                 s.journey_day AS journeyDay,
                 s.distance_km AS distanceKm,
-                CASE
-                    WHEN s.station_code = ? THEN TRUE
-                    ELSE FALSE
-                END AS boardingStop,
-                CASE
-                    WHEN s.station_code = ? THEN TRUE
-                    ELSE FALSE
-                END AS alightingStop
+                CASE WHEN s.station_code = ? THEN TRUE ELSE FALSE END AS boardingStop,
+                CASE WHEN s.station_code = ? THEN TRUE ELSE FALSE END AS alightingStop
             FROM trains t
             JOIN train_stops s
                 ON t.train_number = s.train_number
@@ -140,3 +132,4 @@ public class TrainController {
             trainNumber
         );
     }
+}
